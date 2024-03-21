@@ -5,7 +5,7 @@ from subprocess import CalledProcessError
 from time import sleep
 from typing import Tuple
 
-from utils import SSHExec, non_block_read, qemu_vm, setup, rm_ansi_escape
+from utils import *
 from psutil import Process
 
 
@@ -97,27 +97,6 @@ def main():
     print("terminate...")
     qemu.terminate()
     sleep(3)
-
-
-def free_pages(buddyinfo: str) -> Tuple[int, int]:
-    """Calculates the number of free small and huge pages from the buddy allocator state."""
-    small = 0
-    huge = 0
-    for line in buddyinfo.splitlines():
-        orders = line.split()[4:]
-        for order, free in enumerate(orders):
-            small += int(free) << order
-            if order >= 9:
-                huge += int(free) << (order - 9)
-    return small, huge
-
-
-def mem_cached(meminfo: str) -> int:
-    """Returns the amount of cached memory in bytes"""
-    for line in meminfo.splitlines():
-        if line.startswith("Cached:"):
-            return int(line.split()[1]) * 1024
-    raise Exception("invalid meminfo")
 
 
 if __name__ == "__main__":
