@@ -67,6 +67,17 @@ def non_block_read(output: IO[str]) -> str:
     return out
 
 
+BALLOON_CFG = {
+    "base-manual": lambda cores: qemu_virtio_balloon_args(cores, False),
+    "base-auto": lambda cores: qemu_virtio_balloon_args(cores, True),
+    "huge-manual": lambda cores: qemu_virtio_balloon_args(cores, False),
+    "huge-auto": lambda cores: qemu_virtio_balloon_args(cores, True),
+    "llfree-manual": lambda cores: qemu_llfree_balloon_args(cores, False, False),
+    "llfree-manual-map": lambda cores: qemu_llfree_balloon_args(cores, False, True),
+    "llfree-auto": lambda cores: qemu_llfree_balloon_args(cores, True, False),
+    "llfree-auto-map": lambda cores: qemu_llfree_balloon_args(cores, True, True),
+}
+
 def qemu_llfree_balloon_args(cores: int, auto: bool, guest_triggered: bool) -> List[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
@@ -74,8 +85,8 @@ def qemu_llfree_balloon_args(cores: int, auto: bool, guest_triggered: bool) -> L
     device = {
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
-        "guest-triggered-deflate": auto and guest_triggered,
-        "allocating-deflate": auto and guest_triggered,
+        "guest-triggered-deflate": guest_triggered,
+        "allocating-deflate": guest_triggered,
         "auto-mode-iothread": auto_mode_iothread,
         "api-triggered-mode-iothread": api_mode_iothread,
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
@@ -101,51 +112,56 @@ def qemu_vm(
     delay: int = 15,
     hda: str = "resources/hda.qcow2",
     kvm: bool = True,
-    extra_args: Optional[List[str]] = None
+    qmp_port: int = 5023,
+    extra_args: List[str] | None = None,
+    env: Dict[str, str] | None = None,
 ) -> Popen[str]:
-    """
-    Start a vm with the given configuration.
-    """
+    """Start a vm with the given configuration."""
     assert cores > 0 and cores % sockets == 0
     assert cores <= psutil.cpu_count()
     assert mem > 0 and mem % sockets == 0
     assert Path(hda).exists()
 
-    # every nth cpu
-    def cpus(i) -> str:
-        return ",".join([
-            f"cpus={c}" for c in range(i, cores, sockets)
-        ])
+    assert sockets == 1, "not supported"
 
-    max_mem = mem + sockets
-    slots = sockets
+    # every nth cpu
+    # def cpus(i) -> str:
+    #     return ",".join([
+    #         f"cpus={c}" for c in range(i, cores, sockets)
+    #     ])
+
+    # max_mem = mem + sockets
+    # slots = sockets
+
     if not extra_args:
         extra_args = []
 
     args = [
         qemu,
-        "-m", f"{mem}G,slots={slots},maxmem={max_mem}G",
-        "-smp", f"{cores},sockets={sockets},maxcpus={cores}",
+        "-m", f"{mem}G",
+        # "-m", f"{mem}G,slots={slots},maxmem={max_mem}G",
+        "-smp", f"{cores}",
+        # "-smp", f"{cores},sockets={sockets},maxcpus={cores}",
         "-hda", hda,
-        "-machine", "pc,accel=kvm,nvdimm=on",
         "-serial", "mon:stdio",
         "-nographic",
         "-kernel", kernel,
+        "-qmp", f"tcp:localhost:{qmp_port},server=on,wait=off",
         "-append", "root=/dev/sda1 console=ttyS0 nokaslr",
         "-nic", f"user,hostfwd=tcp:127.0.0.1:{port}-:22",
         "-no-reboot",
-        "--cpu", "host,-rdtscp",
-        *chain(*[["-numa", f"node,{cpus(i)},nodeid={i},memdev=m{i}"]
-                 for i in range(sockets)]),
-        *chain(*[["-object", f"memory-backend-ram,size={mem // sockets}G,id=m{i}"]
-                 for i in range(sockets)]),
+        "--cpu", "host",
+        # *chain(*[["-numa", f"node,{cpus(i)},nodeid={i},memdev=m{i}"]
+        #          for i in range(sockets)]),
+        # *chain(*[["-object", f"memory-backend-ram,size={mem // sockets}G,id=m{i}"]
+        #          for i in range(sockets)]),
         *extra_args,
     ]
 
     if kvm:
         args.append("-enable-kvm")
 
-    process = Popen(args, stdout=PIPE, stderr=STDOUT, text=True)
+    process = Popen(args, stdout=PIPE, stderr=STDOUT, text=True, env=env)
 
     # wait for startup
     sleep(delay)
@@ -154,9 +170,7 @@ def qemu_vm(
 
 
 class SSHExec:
-    """
-    Executing shell commands over ssh.
-    """
+    """Executing shell commands over ssh."""
 
     def __init__(self, user: str, host: str = "localhost", port: int = 22) -> None:
         self.user = user
@@ -208,12 +222,14 @@ def free_pages(buddyinfo: str) -> Tuple[int, int]:
     return small, huge
 
 
-def mem_cached(meminfo: str) -> int:
-    """Returns the amount of cached memory in bytes"""
-    for line in meminfo.splitlines():
-        if line.startswith("Cached:"):
-            return int(line.split()[1]) * 1024
-    raise Exception("invalid meminfo")
+def parse_meminfo(meminfo: str) -> Dict[str, int]:
+    """Parses linux meminfo to a dict"""
+    def parse_line(line: str) -> Tuple[str, int]:
+        [k, v] = map(str.strip, line.split(":"))
+        v = (int(v[:-3]) * 1024) if v.endswith(" kB") else int(v)
+        return k, v
+
+    return dict(map(parse_line, meminfo.strip().splitlines()))
 
 
 def sys_info() -> dict:
@@ -225,16 +241,9 @@ def sys_info() -> dict:
 
 
 def mem_info() -> dict:
-    rows = {"MemTotal", "MemFree", "MemAvailable"}
-    out = {}
-    for row in open("/proc/meminfo"):
-        try:
-            [key, value] = list(map(lambda v: v.strip(), row.split(":")))
-            if key in rows:
-                out[key] = value
-        except:
-            pass
-    return out
+    meminfo = parse_meminfo(Path("/proc/meminfo").read_text())
+    whitelist = {"MemTotal", "MemFree", "MemAvailable"}
+    return { k: v for k, v in meminfo.items() if k in whitelist }
 
 
 def git_info(args: Dict[str, Any]) -> Dict[str, Any]:

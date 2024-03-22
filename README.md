@@ -13,5 +13,5 @@ Run benchmark:
 ```sh
 ./max_power.sh python compiling.py --qemu <path> --kernel <path> --img <path> -c 8 -m 8 --suffix demo
 # e.g.
-sudo ./max_power.sh python3 compiling.py --qemu ../../llfree-ballooning-qemu/build/qemu-system-x86_64 --kernel ../../llfree-linux-ballooning/build-llfree-vm/arch/x86/boot/bzImage --img ../../llfree-ballooning-work/workplace/drives/debian_drive.img -c 8 -m 8 --suffix demo
+sudo ./max_power.sh python3 compiling.py --qemu /opt/ballooning/llfree-qemu-system --kernel /opt/ballooning/llfree-bzImage --img /opt/ballooning/debian.img -c 8 -m 8 --suffix demo --mode llfree-auto
 ```
