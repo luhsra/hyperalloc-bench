@@ -1,26 +1,64 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Action, Namespace
 import shlex
 from subprocess import CalledProcessError
 from time import sleep
+from typing import Any, Sequence
 
 from utils import *
 from psutil import Process
 
 
+DEFAULTS = {
+    "base": {
+        "qemu": "/opt/ballooning/virtio-qemu-system",
+        "kernel": "/opt/ballooning/buddy-bzImage",
+    },
+    "huge": {
+        "qemu": "/opt/ballooning/huge-qemu-system",
+        "kernel": "/opt/ballooning/buddy-bzImage",
+    },
+    "llfree": {
+        "qemu": "/opt/ballooning/llfree-qemu-system",
+        "kernel": "/opt/ballooning/llfree-bzImage",
+    },
+}
+
+class ModeAction(Action):
+    def __init__(self, option_strings: Sequence[str], dest: str,
+                 nargs: int | str | None = None, **kwargs) -> None:
+        assert nargs is None, "nargs not allowed"
+        super().__init__(option_strings, dest, nargs, **kwargs)
+
+    def __call__(self, parser: ArgumentParser, namespace: Namespace,
+                 values: str | Sequence[Any] | None,
+                 option_string: str | None = None) -> None:
+        assert isinstance(values, str)
+        assert values in BALLOON_CFG.keys(), f"mode has to be on of {list(BALLOON_CFG.keys())}"
+
+        kind = values.split("-")[0]
+        assert kind in DEFAULTS
+
+        if namespace.qemu is None: namespace.qemu = DEFAULTS[kind]["qemu"]
+        if namespace.kernel is None: namespace.kernel = DEFAULTS[kind]["kernel"]
+        if namespace.suffix is None: namespace.suffix = values
+        setattr(namespace, self.dest, values)
+
+
 def main():
     parser = ArgumentParser(
         description="Compiling linux in a vm while monitoring memory usage")
-    parser.add_argument("--qemu", default="qemu-system-x86_64")
-    parser.add_argument("--kernel", required=True)
+    parser.add_argument("--qemu")
+    parser.add_argument("--kernel")
     parser.add_argument("--user", default="debian")
-    parser.add_argument("--img", default="resources/hda.qcow2")
-    parser.add_argument("--port", default=5222, type=int)
-    parser.add_argument("-m", "--mem", default=32, type=int)
+    parser.add_argument("--img", default="/opt/ballooning/debian.img")
+    parser.add_argument("--port", type=int, default=5222)
+    parser.add_argument("-m", "--mem", type=int, default=8)
     parser.add_argument("-c", "--cores", type=int, default=8)
     parser.add_argument("-i", "--iter", type=int, default=1)
     parser.add_argument("--frag", action="store_true")
-    parser.add_argument("--post-delay", default=10, type=int)
-    parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()), required=True)
+    parser.add_argument("--post-delay", type=int, default=10)
+    parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
+                        required=True, action=ModeAction)
     args, root = setup("compiling", parser, custom="vm")
 
     ssh = SSHExec(args.user, port=args.port)
@@ -50,9 +88,6 @@ def main():
             mem_usage.write("rss,small,huge,cached\n")
 
             ssh.run("make -C llfree-linux clean")
-            if args.frag:
-                output = ssh.output("cat /proc/llfree_frag")
-                (root / f"frag_{i}_s.txt").write_text(output)
 
             def measure(sec: int, process: Popen[str] | None = None):
                 small, huge = free_pages(ssh.output("cat /proc/buddyinfo"))
@@ -90,14 +125,16 @@ def main():
                 measure(s)
                 sleep(1)
             assert process.poll() is not None
-            clean_end = sec + args.post_delay
+            sec += args.post_delay
+            clean_end = sec
 
             # Shrink page cache
             ssh.run(f"echo 1 | sudo tee /proc/sys/vm/drop_caches")
             for s in range(sec, sec + args.post_delay):
                 measure(s)
                 sleep(1)
-            shrink_end = sec + args.post_delay
+            sec += args.post_delay
+            shrink_end = sec
 
             (root / f"times_{i}.json").write_text(json.dumps({
                 "build": build_end, "delay": delay_end,
