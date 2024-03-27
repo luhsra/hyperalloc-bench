@@ -163,6 +163,15 @@ def qemu_vm(
 
     process = Popen(args, stdout=PIPE, stderr=STDOUT, text=True, env=env)
 
+    # Pin qemu to a cpuset on one numa node with one core per vcpu
+    CORES_NODE = psutil.cpu_count(logical=False) // 2
+    cpu_set = list(map(lambda x: x * 2, range(0, min(cores, CORES_NODE))))
+    if cores > CORES_NODE:
+        cpu_set += list(map(lambda x: x * 2 + 1, list(range(0, cores - CORES_NODE))))
+
+    q = psutil.Process(process.pid)
+    q.cpu_affinity(cpu_set)
+
     # wait for startup
     sleep(delay)
 
