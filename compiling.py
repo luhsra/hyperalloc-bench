@@ -25,12 +25,12 @@ DEFAULTS = {
 
 TARGET = {
     "linux": {
-        "build": "make -C llfree-linux -j{cores}",
-        "clean": "make -C llfree-linux clean",
+        "build": "make -C llfree-linux -j`nproc`",
+        "clean": "make -C llfree-linux -j`nproc` clean",
     },
-    "linux": {
-        "build": "ninja -C build",
-        "clean": "ninja -C build clean",
+    "clang": {
+        "build": "ninja -C llvm-project/build",
+        "clean": "ninja -C llvm-project/build clean",
     }
 }
 
@@ -89,8 +89,6 @@ def main():
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
         (root / "boot.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
 
-        # ssh.run(f"echo 200 | sudo tee /proc/sys/vm/vfs_cache_pressure")
-
         for i in range(args.iter):
             if qemu.poll() is not None:
                 raise Exception("Qemu crashed")
@@ -100,7 +98,7 @@ def main():
             mem_usage = (root / f"out_{i}.csv").open("w+")
             mem_usage.write("rss,small,huge,cached\n")
 
-            ssh.run("make -C llfree-linux clean")
+            ssh.run(TARGET[args.target]["clean"])
 
             def measure(sec: int, process: Popen[str] | None = None):
                 small, huge = free_pages(ssh.output("cat /proc/buddyinfo"))
@@ -117,7 +115,7 @@ def main():
                         f.write(rm_ansi_escape(non_block_read(process.stdout)))
 
             measure(0)
-            process = ssh.background(f"make -C llfree-linux -j{args.cores}")
+            process = ssh.background(TARGET[args.target]["build"])
 
             sec = 1
             while process.poll() is None:
@@ -133,7 +131,7 @@ def main():
             sec += args.post_delay
             delay_end = sec
 
-            process = ssh.background("make -C llfree-linux clean")
+            process = ssh.background(TARGET[args.target]["clean"])
             for s in range(sec, sec + args.post_delay):
                 measure(s)
                 sleep(1)
