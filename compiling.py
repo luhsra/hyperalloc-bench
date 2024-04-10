@@ -23,6 +23,17 @@ DEFAULTS = {
     },
 }
 
+TARGET = {
+    "linux": {
+        "build": "make -C llfree-linux -j{cores}",
+        "clean": "make -C llfree-linux clean",
+    },
+    "linux": {
+        "build": "ninja -C build",
+        "clean": "ninja -C build clean",
+    }
+}
+
 class ModeAction(Action):
     def __init__(self, option_strings: Sequence[str], dest: str,
                  nargs: int | str | None = None, **kwargs) -> None:
@@ -59,6 +70,7 @@ def main():
     parser.add_argument("--post-delay", type=int, default=10)
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
+    parser.add_argument("--target", choices=list(TARGET.keys()))
     args, root = setup("compiling", parser, custom="vm")
 
     ssh = SSHExec(args.user, port=args.port)
@@ -69,7 +81,8 @@ def main():
         print("start qemu...")
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.mem, args.cores, hda=args.img,
                        extra_args=BALLOON_CFG[args.mode](args.cores),
-                       env={**os.environ, "QEMU_LLFREE_LOG": str(root / "llfree_log.txt")})
+                       env={**os.environ, "QEMU_VIRTIO_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
+                            "QEMU_VIRTIO_BALLOON_DEFLATE_LOG": str(root / "def_log.txt")})
         ps_proc = Process(qemu.pid)
 
         print("started")
