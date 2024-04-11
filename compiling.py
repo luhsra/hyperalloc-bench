@@ -23,6 +23,17 @@ DEFAULTS = {
     },
 }
 
+TARGET = {
+    "linux": {
+        "build": "make -C llfree-linux -j`nproc`",
+        "clean": "make -C llfree-linux -j`nproc` clean",
+    },
+    "clang": {
+        "build": "ninja -C llvm-project/build",
+        "clean": "ninja -C llvm-project/build clean",
+    }
+}
+
 class ModeAction(Action):
     def __init__(self, option_strings: Sequence[str], dest: str,
                  nargs: int | str | None = None, **kwargs) -> None:
@@ -59,6 +70,7 @@ def main():
     parser.add_argument("--post-delay", type=int, default=10)
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
+    parser.add_argument("--target", choices=list(TARGET.keys()))
     args, root = setup("compiling", parser, custom="vm")
 
     ssh = SSHExec(args.user, port=args.port)
@@ -69,14 +81,13 @@ def main():
         print("start qemu...")
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.mem, args.cores, hda=args.img,
                        extra_args=BALLOON_CFG[args.mode](args.cores),
-                       env={**os.environ, "QEMU_LLFREE_LOG": str(root / "llfree_log.txt")})
+                       env={**os.environ, "QEMU_VIRTIO_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
+                            "QEMU_VIRTIO_BALLOON_DEFLATE_LOG": str(root / "def_log.txt")})
         ps_proc = Process(qemu.pid)
 
         print("started")
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
         (root / "boot.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
-
-        # ssh.run(f"echo 200 | sudo tee /proc/sys/vm/vfs_cache_pressure")
 
         for i in range(args.iter):
             if qemu.poll() is not None:
@@ -87,7 +98,7 @@ def main():
             mem_usage = (root / f"out_{i}.csv").open("w+")
             mem_usage.write("rss,small,huge,cached\n")
 
-            ssh.run("make -C llfree-linux clean")
+            ssh.run(TARGET[args.target]["clean"])
 
             def measure(sec: int, process: Popen[str] | None = None):
                 small, huge = free_pages(ssh.output("cat /proc/buddyinfo"))
@@ -104,7 +115,7 @@ def main():
                         f.write(rm_ansi_escape(non_block_read(process.stdout)))
 
             measure(0)
-            process = ssh.background(f"make -C llfree-linux -j{args.cores}")
+            process = ssh.background(TARGET[args.target]["build"])
 
             sec = 1
             while process.poll() is None:
@@ -120,7 +131,7 @@ def main():
             sec += args.post_delay
             delay_end = sec
 
-            process = ssh.background("make -C llfree-linux clean")
+            process = ssh.background(TARGET[args.target]["clean"])
             for s in range(sec, sec + args.post_delay):
                 measure(s)
                 sleep(1)
