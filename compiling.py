@@ -79,8 +79,8 @@ def main():
 
     try:
         print("start qemu...")
-        qemu = qemu_vm(args.qemu, args.port, args.kernel, args.mem, args.cores, hda=args.img,
-                       extra_args=BALLOON_CFG[args.mode](args.cores),
+        qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
+                       extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, 0, args.mem),
                        env={**os.environ, "QEMU_VIRTIO_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
                             "QEMU_VIRTIO_BALLOON_DEFLATE_LOG": str(root / "def_log.txt")})
         ps_proc = Process(qemu.pid)

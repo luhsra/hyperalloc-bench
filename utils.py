@@ -68,17 +68,20 @@ def non_block_read(output: IO[str]) -> str:
 
 
 BALLOON_CFG = {
-    "base-manual": lambda cores: qemu_virtio_balloon_args(cores, False),
-    "base-auto": lambda cores: qemu_virtio_balloon_args(cores, True),
-    "huge-manual": lambda cores: qemu_virtio_balloon_args(cores, False),
-    "huge-auto": lambda cores: qemu_virtio_balloon_args(cores, True),
-    "llfree-manual": lambda cores: qemu_llfree_balloon_args(cores, False, False),
-    "llfree-manual-map": lambda cores: qemu_llfree_balloon_args(cores, False, True),
-    "llfree-auto": lambda cores: qemu_llfree_balloon_args(cores, True, False),
-    "llfree-auto-map": lambda cores: qemu_llfree_balloon_args(cores, True, True),
+    "base-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, False),
+    "base-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, True),
+    "huge-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, False),
+    "huge-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, True),
+    "llfree-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, False, False),
+    "llfree-manual-map": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, False, True),
+    "llfree-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, True, False),
+    "llfree-auto-map": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, True, True),
+    "virtio-mem-kernel": lambda _cores, mem, inital_balloon, max_balloon: qemu_virtio_mem_args(mem, inital_balloon, max_balloon, True),
+    "virtio-mem-movable": lambda _cores, mem, inital_balloon, max_balloon: qemu_virtio_mem_args(mem, inital_balloon, max_balloon, False),
 }
 
-def qemu_llfree_balloon_args(cores: int, auto: bool, guest_triggered: bool) -> List[str]:
+DEFAULT_KERNEL_CMD = "root=/dev/sda1 console=ttyS0 nokaslr"
+def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool, guest_triggered: bool) -> List[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
     api_mode_iothread = "api-triggered-mode-iothread"
@@ -92,21 +95,34 @@ def qemu_llfree_balloon_args(cores: int, auto: bool, guest_triggered: bool) -> L
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
     }
     return [
+        "-m", f"{mem}G",
+        "-append", DEFAULT_KERNEL_CMD,
         "-object", f"iothread,id={auto_mode_iothread}",
         "-object", f"iothread,id={api_mode_iothread}",
         *chain(*[["-object", f"iothread,id={t}"] for t in per_core_iothreads]),
         "-device", json.dumps(device)
     ]
 
-def qemu_virtio_balloon_args(cores: int, auto: bool) -> List[str]:
-    return ["-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
+def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
+    return ["-m", f"{mem}G","-append", DEFAULT_KERNEL_CMD,"-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
+
+def qemu_virtio_mem_args(mem: int, inital_balloon: int, max_balloon: int, kernel: bool) -> List[str]:
+    default_state = "online_kernel" if kernel else "online_movable"
+    max_mem = mem + max_balloon
+    extra_mem = max_balloon - inital_balloon 
+    return [
+        "-m", f"{mem}G,maxmem={max_mem}G",
+        "-append", f"{DEFAULT_KERNEL_CMD} memhp_default_state={default_state}",
+        "-machine", "pc",
+        "-object", f"memory-backend-ram,id=vmem0,size={max_balloon}G,prealloc=off,reserve=off",
+        "-device", f"virtio-mem-pci,id=vm0,memdev=vmem0,node=0,requested-size={extra_mem}G,prealloc=off"
+    ]
 
 
 def qemu_vm(
     qemu: str | Path = "qemu-system-x86_64",
     port: int = 5022,
     kernel: str = "bzImage",
-    mem: int = 8,
     cores: int = 8,
     sockets: int = 1,
     delay: int = 15,
@@ -119,7 +135,7 @@ def qemu_vm(
     """Start a vm with the given configuration."""
     assert cores > 0 and cores % sockets == 0
     assert cores <= psutil.cpu_count()
-    assert mem > 0 and mem % sockets == 0
+    #assert mem > 0 and mem % sockets == 0
     assert Path(hda).exists()
 
     assert sockets == 1, "not supported"
@@ -138,7 +154,7 @@ def qemu_vm(
 
     args = [
         qemu,
-        "-m", f"{mem}G",
+        #"-m", f"{mem}G",
         # "-m", f"{mem}G,slots={slots},maxmem={max_mem}G",
         "-smp", f"{cores}",
         # "-smp", f"{cores},sockets={sockets},maxcpus={cores}",
@@ -147,7 +163,6 @@ def qemu_vm(
         "-nographic",
         "-kernel", kernel,
         "-qmp", f"tcp:localhost:{qmp_port},server=on,wait=off",
-        "-append", "root=/dev/sda1 console=ttyS0 nokaslr",
         "-nic", f"user,hostfwd=tcp:127.0.0.1:{port}-:22",
         "-no-reboot",
         "--cpu", "host",
@@ -217,6 +232,11 @@ class SSHExec:
             ["scp", "-o StrictHostKeyChecking=no", f"-P{self.port}",
              file, f"{self.user}@{self.host}:{target}"], timeout=30)
 
+    def download(self, source: Path, dest: Path):
+        """Download a file over ssh."""
+        check_call(
+            ["scp", "-o StrictHostKeyChecking=no", f"-P{self.port}",
+                f"{self.user}@{self.host}:{source}", dest], timeout=30)
 
 def free_pages(buddyinfo: str) -> Tuple[int, int]:
     """Calculates the number of free small and huge pages from the buddy allocator state."""
