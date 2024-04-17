@@ -14,8 +14,8 @@ DEFAULTS = {
         "kernel": "/opt/ballooning/buddy-bzImage",
     },
     "huge": {
-        "qemu": "/opt/ballooning/huge-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
+        "qemu": "/opt/ballooning/virtio-huge-qemu-system",
+        "kernel": "/opt/ballooning/buddy-huge-bzImage",
     },
     "llfree": {
         "qemu": "/opt/ballooning/llfree-qemu-system",
@@ -31,6 +31,10 @@ TARGET = {
     "clang": {
         "build": "ninja -C llvm-project/build",
         "clean": "ninja -C llvm-project/build clean",
+    },
+    "blender": {
+        "build": "cd cpu2017 && source shrc && ulimit -s 2097152 && runcpu --config=ballooning.cfg --tune=peak --copies=`nproc` --action=onlyrun 526.blender_r",
+        "clean": "echo nop",
     }
 }
 
