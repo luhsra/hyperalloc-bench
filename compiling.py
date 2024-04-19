@@ -70,8 +70,9 @@ def main():
     parser.add_argument("-m", "--mem", type=int, default=8)
     parser.add_argument("-c", "--cores", type=int, default=8)
     parser.add_argument("-i", "--iter", type=int, default=1)
+    parser.add_argument("-r", "--repeat", type=int, default=1)
     parser.add_argument("--frag", action="store_true")
-    parser.add_argument("--post-delay", type=int, default=10)
+    parser.add_argument("--delay", type=int, default=10)
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
     parser.add_argument("--target", choices=list(TARGET.keys()))
@@ -119,22 +120,30 @@ def main():
                         f.write(rm_ansi_escape(non_block_read(process.stdout)))
 
             measure(0)
-            process = ssh.background(TARGET[args.target]["build"])
 
             sec = 1
-            while process.poll() is None:
-                measure(sec, process)
-                sleep(1)
-                sec += 1
-            build_end = sec
 
-            # After the compilation
-            for s in range(sec, sec + args.post_delay):
-                measure(s)
-                sleep(1)
-            sec += args.post_delay
-            delay_end = sec
+            build_end = []
+            delay_end = []
 
+            for r in range(args.repeat):
+                # Compilation
+                process = ssh.background(TARGET[args.target]["build"])
+
+                while process.poll() is None:
+                    measure(sec, process)
+                    sleep(1)
+                    sec += 1
+                build_end.append(sec)
+
+                # Delay after the compilation
+                for s in range(sec, sec + args.post_delay):
+                    measure(s)
+                    sleep(1)
+                sec += args.post_delay
+                delay_end.append(sec)
+
+            # Clean
             process = ssh.background(TARGET[args.target]["clean"])
             for s in range(sec, sec + args.post_delay):
                 measure(s)
