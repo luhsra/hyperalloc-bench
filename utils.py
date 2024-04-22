@@ -322,3 +322,15 @@ def dref_dataframe(name: str, dir: Path, groupby: List[str], data: pd.DataFrame)
         out["/".join(map(str, index))] = row.values[0]
     with (dir / f"{name}.dref").open("w+") as f:
         dump_dref(f, name, out)
+
+def dref_dataframe_multi(name: str, dir: Path, groupby: List[str], vars: List[str], data: pd.DataFrame):
+    out = {}
+    for var in vars:
+        ignored_cols = vars.copy()
+        ignored_cols.remove(var)
+        d = data[data.columns.difference(ignored_cols)].dropna(axis=0).groupby(groupby).mean(numeric_only=True)
+        for index, row in d.iterrows():
+            out["/".join(map(str, index)) + f"/{var}"] = row.values[0]
+
+    with (dir / f"{name}.dref").open("w+") as f:
+        dump_dref(f, name, out)
