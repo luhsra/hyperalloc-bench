@@ -88,8 +88,8 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool, guest_triggered: 
     device = {
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
-        "guest-triggered-deflate": guest_triggered,
-        "allocating-deflate": guest_triggered,
+        # "guest-triggered-deflate": guest_triggered,
+        # "allocating-deflate": guest_triggered,
         "auto-mode-iothread": auto_mode_iothread,
         "api-triggered-mode-iothread": api_mode_iothread,
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
@@ -109,7 +109,7 @@ def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
 def qemu_virtio_mem_args(mem: int, inital_balloon: int, max_balloon: int, kernel: bool) -> List[str]:
     default_state = "online_kernel" if kernel else "online_movable"
     max_mem = mem + max_balloon
-    extra_mem = max_balloon - inital_balloon 
+    extra_mem = max_balloon - inital_balloon
     return [
         "-m", f"{mem}G,maxmem={max_mem}G",
         "-append", f"{DEFAULT_KERNEL_CMD} memhp_default_state={default_state}",

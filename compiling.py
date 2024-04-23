@@ -84,10 +84,16 @@ def main():
 
     try:
         print("start qemu...")
+        env = {
+            **os.environ,
+            "QEMU_VIRTIO_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
+            "QEMU_VIRTIO_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
+            "QEMU_LLFREE_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
+            "QEMU_LLFREE_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
+        }
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, 0, args.mem),
-                       env={**os.environ, "QEMU_VIRTIO_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
-                            "QEMU_VIRTIO_BALLOON_DEFLATE_LOG": str(root / "def_log.txt")})
+                       env=env)
         ps_proc = Process(qemu.pid)
 
         print("started")
@@ -137,27 +143,27 @@ def main():
                 build_end.append(sec)
 
                 # Delay after the compilation
-                for s in range(sec, sec + args.post_delay):
+                for s in range(sec, sec + args.delay):
                     measure(s)
                     sleep(1)
-                sec += args.post_delay
+                sec += args.delay
                 delay_end.append(sec)
 
             # Clean
             process = ssh.background(TARGET[args.target]["clean"])
-            for s in range(sec, sec + args.post_delay):
+            for s in range(sec, sec + args.delay):
                 measure(s)
                 sleep(1)
             assert process.poll() is not None
-            sec += args.post_delay
+            sec += args.delay
             clean_end = sec
 
             # Shrink page cache
             ssh.run(f"echo 1 | sudo tee /proc/sys/vm/drop_caches")
-            for s in range(sec, sec + args.post_delay):
+            for s in range(sec, sec + args.delay):
                 measure(s)
                 sleep(1)
-            sec += args.post_delay
+            sec += args.delay
             shrink_end = sec
 
             (root / f"times_{i}.json").write_text(json.dumps({
