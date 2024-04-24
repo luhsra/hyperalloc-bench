@@ -6,6 +6,7 @@ from typing import Any, Sequence
 
 from utils import *
 from psutil import Process
+import signal
 
 
 DEFAULTS = {
@@ -72,6 +73,7 @@ def main():
     parser.add_argument("-i", "--iter", type=int, default=1)
     parser.add_argument("-r", "--repeat", type=int, default=1)
     parser.add_argument("--frag", action="store_true")
+    parser.add_argument("--perf", action="store_true")
     parser.add_argument("--delay", type=int, default=10)
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
@@ -125,6 +127,11 @@ def main():
                     with (root / f"out_{i}.txt").open("a+") as f:
                         f.write(rm_ansi_escape(non_block_read(process.stdout)))
 
+            # Start profiling
+            if args.perf:
+                perf_file = root / f"{i}.perf.guest"
+                perf = Popen(shlex.split(f"perf kvm stat record -p {qemu.pid} -o {perf_file}"), stderr=STDOUT)
+
             measure(0)
 
             sec = 1
@@ -149,6 +156,10 @@ def main():
                 sec += args.delay
                 delay_end.append(sec)
 
+            # Signal perf to dump it's trace
+            if args.perf:
+                perf.send_signal(signal.SIGINT)
+            
             # Clean
             process = ssh.background(TARGET[args.target]["clean"])
             for s in range(sec, sec + args.delay):
@@ -170,6 +181,17 @@ def main():
                 "build": build_end, "delay": delay_end,
                 "clean": clean_end, "shrink": shrink_end
             }))
+
+            if args.perf:
+                # Make sure perf finished writing the profile
+                while perf.poll() is None:
+                    sleep(1)
+
+                # `perf report` write to stderr for some reason, so we can't use `check_output()`
+                with open(root / f"{i}_perfstats.txt", "w+") as f:
+                    perf_stats = Popen(shlex.split(f"perf kvm -i {perf_file} stat report --event=vmexit"), stderr=f)
+                while perf_stats.poll() is None:
+                    continue
 
     except Exception as e:
         print(e)
