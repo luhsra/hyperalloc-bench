@@ -36,6 +36,10 @@ TARGET = {
     "blender": {
         "build": "cd cpu2017 && source shrc && ulimit -s 2097152 && runcpu --config=ballooning.cfg --tune=peak --copies=`nproc` --action=onlyrun 526.blender_r",
         "clean": "echo nop",
+    },
+    "write": {
+        "build": "./write -t`nproc` -m8",
+        "clean": "echo nop",
     }
 }
 
@@ -148,6 +152,8 @@ def main():
                     sleep(1)
                     sec += 1
                 build_end.append(sec)
+                with (root / f"out_{i}.txt").open("a+") as f:
+                    f.write(process.stdout.read())
 
                 # Delay after the compilation
                 for s in range(sec, sec + args.delay):
@@ -159,7 +165,7 @@ def main():
             # Signal perf to dump it's trace
             if args.perf:
                 perf.send_signal(signal.SIGINT)
-            
+
             # Clean
             process = ssh.background(TARGET[args.target]["clean"])
             for s in range(sec, sec + args.delay):

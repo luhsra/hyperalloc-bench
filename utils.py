@@ -81,13 +81,14 @@ BALLOON_CFG = {
 }
 
 DEFAULT_KERNEL_CMD = "root=/dev/sda1 console=ttyS0 nokaslr"
-def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool, guest_triggered: bool) -> List[str]:
+def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool, ioctl: bool) -> List[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
     api_mode_iothread = "api-triggered-mode-iothread"
     device = {
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
+        "kvm-map-ioctl": ioctl,
         # "guest-triggered-deflate": guest_triggered,
         # "allocating-deflate": guest_triggered,
         "auto-mode-iothread": auto_mode_iothread,
