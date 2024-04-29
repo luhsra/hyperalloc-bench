@@ -133,9 +133,14 @@ def main():
 
             # Start profiling
             if args.perf:
-                perf_file = root / f"{i}.perf.guest"
-                perf = Popen(shlex.split(f"perf kvm stat record -p {qemu.pid} -o {perf_file}"), stderr=STDOUT)
+                perf_file = open(root / f"{i}_perfstats.json", "w+")
+                # The filter for the kvm_exit event ensures that perf only counts exits that are ept violations
+                # This does only work for intel though, AMD uses different values/formats
+                # For more info on filters, see: https://www.kernel.org/doc/html/latest/trace/events.html#event-filtering
+                # NOTE: The --filter arg is not documented for perf stat, but does seem to work anyways. Not sure if this is a bug...
+                perf = Popen(shlex.split(f"perf stat -e \"kvm:kvm_exit\" --filter \"exit_reason==48\" -e \"dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses\" -j -p {qemu.pid}"), stderr=perf_file)
 
+            t_user_start, t_system_start, *_ = ps_proc.cpu_times()
             measure(0)
 
             sec = 1
@@ -162,6 +167,7 @@ def main():
                 sec += args.delay
                 delay_end.append(sec)
 
+            t_user_end, t_system_end, *_ = ps_proc.cpu_times()
             # Signal perf to dump it's trace
             if args.perf:
                 perf.send_signal(signal.SIGINT)
@@ -185,7 +191,10 @@ def main():
 
             (root / f"times_{i}.json").write_text(json.dumps({
                 "build": build_end, "delay": delay_end,
-                "clean": clean_end, "shrink": shrink_end
+                "clean": clean_end, "shrink": shrink_end, "cpu": {
+                    "user": t_user_end - t_user_start,
+                    "system": t_system_end - t_system_start,
+                }
             }))
 
             if args.perf:
@@ -193,11 +202,6 @@ def main():
                 while perf.poll() is None:
                     sleep(1)
 
-                # `perf report` write to stderr for some reason, so we can't use `check_output()`
-                with open(root / f"{i}_perfstats.txt", "w+") as f:
-                    perf_stats = Popen(shlex.split(f"perf kvm -i {perf_file} stat report --event=vmexit"), stderr=f)
-                while perf_stats.poll() is None:
-                    continue
 
     except Exception as e:
         print(e)
