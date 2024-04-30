@@ -29,7 +29,7 @@ SET_BALLOON = {
     "huge-manual": lambda target_size, qmp: qmp.execute("balloon", {"value" : target_size * 1024 * 1024 * 1024}),
     "llfree-manual": lambda target_size, qmp: qmp.execute("llfree-balloon", {"value" : target_size * 1024 * 1024 * 1024}),
     "llfree-manual-map": lambda target_size, qmp: qmp.execute("llfree-balloon", {"value" : target_size * 1024 * 1024 * 1024}),
-    "virtio-mem-kernel": lambda target_size, qmp: qmp.execute("qom-set", {"path": "vm0", 
+    "virtio-mem-kernel": lambda target_size, qmp: qmp.execute("qom-set", {"path": "vm0",
                                                                           "property": "requested-size",
                                                                           "value" : target_size * 1024 * 1024 * 1024}),
     "virtio-mem-movable": lambda target_size, qmp: qmp.execute("qom-set", {"path": "vm0",
@@ -76,7 +76,7 @@ class Stream(Bench):
         parser.add_argument("--stream-bench", choices=list(STREAM_BENCH.keys()), default="copy")
         parser.add_argument("--stream-size", default=45000000, type=int)
 
-        
+
     def __init__(self, ssh: SSHExec, args: Namespace, results: Path, threads: int) -> None:
         super().__init__()
         self._ssh = ssh
@@ -173,7 +173,7 @@ def gen_spec(ssh: SSHExec, root: Path, max_mem:int, time_per_bench:float):
     #print(" ".join(SPEC_SUITE.keys()))
     #exit()
     # NOTE: We need to run their setup script (shrc) everytime to set up the environment
-    #       We also need to increase the stacksize by A LOT. Some of the fortran programs will overflow the stack otherwise (e.g. bwaves). 
+    #       We also need to increase the stacksize by A LOT. Some of the fortran programs will overflow the stack otherwise (e.g. bwaves).
     script = "cd cpu2017\nsource shrc\nulimit -s 2097152\n"
     for (bench, mem) in SPEC_SUITE.items():
         copies = (max_mem * 1024) // mem
@@ -225,11 +225,12 @@ async def main():
             qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
                         extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, args.initial_balloon, args.max_balloon),
                         env={**os.environ, "QEMU_LLFREE_LOG": str(res_dir / "llfree_log.txt")})
+            qemu_wait_startup(qemu, root / "boot.txt")
             ps_proc = Process(qemu.pid)
 
             qmp = QMPClient("STREAM machine")
             await qmp.connect(("127.0.0.1", args.qmp))
-            
+
             print("Started")
             (res_dir / "cmd.sh").write_text(shlex.join(qemu.args))
             ssh = SSHExec(args.user, port=args.port)
@@ -240,12 +241,12 @@ async def main():
             bench.setup()
 
             # Consume memory to blow up the vm
-            if args.spec:        
+            if args.spec:
                 ssh.run("bash run_spec.sh")
             else:
-                print("Allocating")        
+                print("Allocating")
                 ssh.run(f"./write -m {args.workload_mem} -t {args.cores}")
-        
+
             print(await qmp.execute("query-memory-devices"))
             print(await qmp.execute("x-query-numa"))
 
@@ -291,6 +292,6 @@ async def main():
             qemu.terminate()
             raise e
 
-        
+
 
 asyncio.run(main())

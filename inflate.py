@@ -117,7 +117,7 @@ async def main():
 
         print("started")
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
-        (root / "boot.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
+        qemu_wait_startup(qemu, root / "boot.txt")
 
         print(f"Exec c={args.cores}")
         for i in range(args.iter):

@@ -89,8 +89,6 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool, ioctl: bool) -> L
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
         "kvm-map-ioctl": ioctl,
-        # "guest-triggered-deflate": guest_triggered,
-        # "allocating-deflate": guest_triggered,
         "auto-mode-iothread": auto_mode_iothread,
         "api-triggered-mode-iothread": api_mode_iothread,
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
@@ -101,8 +99,19 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool, ioctl: bool) -> L
         "-object", f"iothread,id={auto_mode_iothread}",
         "-object", f"iothread,id={api_mode_iothread}",
         *chain(*[["-object", f"iothread,id={t}"] for t in per_core_iothreads]),
-        "-device", json.dumps(device)
+        "-device", json.dumps(device),
     ]
+
+def vfio_args(iommu_group: int | None) -> List[str]:
+    if iommu_group is None:
+        return []
+    assert (Path("/dev/vfio") / str(iommu_group)).exists(), "IOMMU Group is not bound to VFIO!"
+    path = Path("/sys/kernel/iommu_groups") / str(iommu_group) / "devices"
+    return list(chain(*[
+        ["-device", json.dumps({
+            "driver": "vfio-pci", "host": d.name
+        })] for d in path.iterdir()
+    ]))
 
 def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     return ["-m", f"{mem}G","-append", DEFAULT_KERNEL_CMD,"-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
@@ -126,12 +135,12 @@ def qemu_vm(
     kernel: str = "bzImage",
     cores: int = 8,
     sockets: int = 1,
-    delay: int = 15,
     hda: str = "resources/hda.qcow2",
     kvm: bool = True,
     qmp_port: int = 5023,
     extra_args: List[str] | None = None,
     env: Dict[str, str] | None = None,
+    vfio_group: int | None = None
 ) -> Popen[str]:
     """Start a vm with the given configuration."""
     assert cores > 0 and cores % sockets == 0
@@ -172,6 +181,7 @@ def qemu_vm(
         # *chain(*[["-object", f"memory-backend-ram,size={mem // sockets}G,id=m{i}"]
         #          for i in range(sockets)]),
         *extra_args,
+        *vfio_args(vfio_group)
     ]
 
     if kvm:
@@ -188,10 +198,19 @@ def qemu_vm(
     q = psutil.Process(process.pid)
     q.cpu_affinity(cpu_set)
 
-    # wait for startup
-    sleep(delay)
-
     return process
+
+
+def qemu_wait_startup(qemu: Popen[str], logfile: Path):
+    while True:
+        sleep(5)
+        text = non_block_read(qemu.stdout)
+        if len(text) == 0:
+            # no changes in the past seconds
+            # we either finished or paniced
+            break
+        with logfile.open("a+") as f:
+            f.write(rm_ansi_escape(text))
 
 
 class SSHExec:

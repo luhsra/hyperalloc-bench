@@ -82,6 +82,8 @@ def main():
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
     parser.add_argument("--target", choices=list(TARGET.keys()))
+    parser.add_argument("--vfio", type=int,
+                        help="IOMMU that shoud be passed into VM. This has to be bound to VFIO first!")
     args, root = setup("compiling", parser, custom="vm")
 
     ssh = SSHExec(args.user, port=args.port)
@@ -99,12 +101,13 @@ def main():
         }
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, 0, args.mem),
-                       env=env)
+                       env=env, vfio_group=args.vfio)
         ps_proc = Process(qemu.pid)
 
         print("started")
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
-        (root / "boot.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
+
+        qemu_wait_startup(qemu, root / "boot.txt")
 
         for i in range(args.iter):
             if qemu.poll() is not None:
