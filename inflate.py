@@ -92,6 +92,7 @@ async def main():
     parser.add_argument("--delay", type=int, default=10)
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
+    parser.add_argument("--vfio", type=int)
     args, root = setup("inflate", parser, custom="vm")
 
     ssh = SSHExec(args.user, port=args.port)
@@ -109,7 +110,7 @@ async def main():
         }
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, 0, args.mem - args.shrink_target),
-                       env=env)
+                       env=env, vfio_group=args.vfio)
         ps_proc = Process(qemu.pid)
 
         qmp = QMPClient("STREAM machine")
@@ -117,7 +118,7 @@ async def main():
 
         print("started")
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
-        (root / "boot.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
+        qemu_wait_startup(qemu, root / "boot.txt")
 
         print(f"Exec c={args.cores}")
         for i in range(args.iter):
