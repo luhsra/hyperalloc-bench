@@ -204,12 +204,12 @@ async def main():
     parser.add_argument("--bench-threads", type=int, nargs='+')
     parser.add_argument('--ftq', action="store_true")
     parser.add_argument("--workload-mem", type=int, default=19)
-    parser.add_argument("--workload-time", type=int, default=120) # only for spec
+    parser.add_argument("--workload-time", type=int, default=180) # only for spec
     parser.add_argument("--initial-balloon", type=int, default=0)
     parser.add_argument("--max-balloon", type=int, default=20)
     parser.add_argument("--shrink-target", type=int, default=2)
     parser.add_argument("--post-delay", default=20, type=int)
-    parser.add_argument("--deflate-delay", default=75, type=int)
+    parser.add_argument("--deflate-delay", default=80, type=int)
     Stream.args(parser)
     FTQ.args(parser)
     args, root = setup("stream", parser, custom="vm")
