@@ -72,23 +72,21 @@ BALLOON_CFG = {
     "base-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, True),
     "huge-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, False),
     "huge-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, True),
-    "llfree-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, False, False),
-    "llfree-manual-map": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, False, True),
-    "llfree-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, True, False),
-    "llfree-auto-map": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, True, True),
+    "llfree-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, False),
+    "llfree-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, True),
     "virtio-mem-kernel": lambda _cores, mem, inital_balloon, max_balloon: qemu_virtio_mem_args(mem, inital_balloon, max_balloon, True),
     "virtio-mem-movable": lambda _cores, mem, inital_balloon, max_balloon: qemu_virtio_mem_args(mem, inital_balloon, max_balloon, False),
 }
 
 DEFAULT_KERNEL_CMD = "root=/dev/sda1 console=ttyS0 nokaslr"
-def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool, ioctl: bool) -> List[str]:
+def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
     api_mode_iothread = "api-triggered-mode-iothread"
     device = {
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
-        "kvm-map-ioctl": ioctl,
+        "kvm-map-ioctl": True,
         "auto-mode-iothread": auto_mode_iothread,
         "api-triggered-mode-iothread": api_mode_iothread,
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
