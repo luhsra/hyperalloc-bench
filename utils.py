@@ -200,13 +200,19 @@ def qemu_vm(
 
 
 def qemu_wait_startup(qemu: Popen[str], logfile: Path):
+    count = 0
     while True:
-        sleep(5)
+        sleep(3)
+        assert qemu.poll() is None
         text = non_block_read(qemu.stdout)
         if len(text) == 0:
             # no changes in the past seconds
             # we either finished or paniced
-            break
+            if count > 2:
+                break
+            count += 1
+        else:
+            count = 0
         with logfile.open("a+") as f:
             f.write(rm_ansi_escape(text))
 

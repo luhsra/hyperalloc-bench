@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Action, Namespace
 import asyncio
 import shlex
 from subprocess import CalledProcessError
-from time import sleep, time
+from time import sleep
 from typing import Any, Sequence
 
 from utils import *
@@ -109,16 +109,16 @@ async def main():
             "QEMU_LLFREE_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
         }
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
+                       qmp_port=args.qmp,
                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, 0, args.mem - args.shrink_target),
                        env=env, vfio_group=args.vfio)
         ps_proc = Process(qemu.pid)
 
-        qmp = QMPClient("STREAM machine")
-        await qmp.connect(("127.0.0.1", args.qmp))
-
-        print("started")
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
         qemu_wait_startup(qemu, root / "boot.txt")
+
+        qmp = QMPClient("STREAM machine")
+        await qmp.connect(("127.0.0.1", args.qmp))
 
         print(f"Exec c={args.cores}")
         for i in range(args.iter):
