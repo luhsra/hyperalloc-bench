@@ -35,11 +35,9 @@ TARGET = {
     },
     "blender": {
         "build": "cd cpu2017 && source shrc && ulimit -s 2097152 && runcpu --config=ballooning.cfg --tune=peak --copies=`nproc` --action=onlyrun 526.blender_r",
-        "clean": "echo nop",
     },
     "write": {
         "build": "./write -t`nproc` -m8",
-        "clean": "echo nop",
     }
 }
 
@@ -81,7 +79,7 @@ def main():
     parser.add_argument("--delay", type=int, default=10)
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
-    parser.add_argument("--target", choices=list(TARGET.keys()))
+    parser.add_argument("--target", choices=list(TARGET.keys()), required=True)
     parser.add_argument("--vfio", type=int,
                         help="IOMMU that shoud be passed into VM. This has to be bound to VFIO first!")
     args, root = setup("compiling", parser, custom="vm")
@@ -118,7 +116,8 @@ def main():
             mem_usage = (root / f"out_{i}.csv").open("w+")
             mem_usage.write("rss,small,huge,cached\n")
 
-            ssh.run(TARGET[args.target]["clean"])
+            if "clean" in TARGET[args.target]:
+                ssh.run(TARGET[args.target]["clean"])
 
             def measure(sec: int, process: Popen[str] | None = None):
                 small, huge = free_pages(ssh.output("cat /proc/buddyinfo"))
@@ -176,25 +175,27 @@ def main():
                 perf.send_signal(signal.SIGINT)
 
             # Clean
-            process = ssh.background(TARGET[args.target]["clean"])
-            for s in range(sec, sec + args.delay):
-                measure(s)
-                sleep(1)
-            assert process.poll() is not None
-            sec += args.delay
-            clean_end = sec
+            clean_end = None
+            if "clean" in TARGET[args.target]:
+                process = ssh.background(TARGET[args.target]["clean"])
+                for s in range(sec, sec + args.delay):
+                    measure(s)
+                    sleep(1)
+                assert process.poll() is not None
+                sec += args.delay
+                clean_end = sec
 
-            # Shrink page cache
+            # drop page cache
             ssh.run(f"echo 1 | sudo tee /proc/sys/vm/drop_caches")
             for s in range(sec, sec + args.delay):
                 measure(s)
                 sleep(1)
             sec += args.delay
-            shrink_end = sec
+            drop_end = sec
 
             (root / f"times_{i}.json").write_text(json.dumps({
                 "build": build_end, "delay": delay_end,
-                "clean": clean_end, "shrink": shrink_end, "cpu": {
+                "clean": clean_end, "drop": drop_end, "cpu": {
                     "user": t_user_end - t_user_start,
                     "system": t_system_end - t_system_start,
                 }
