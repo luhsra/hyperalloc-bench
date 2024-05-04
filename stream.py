@@ -186,6 +186,8 @@ def gen_spec(ssh: SSHExec, root: Path, max_mem:int, time_per_bench:float):
     s_path = root / "run_spec.sh"
     s_path.write_text(script)
     ssh.upload(s_path, "~")
+    # Clear the run directories after each run as they are MASSIVE
+    ssh.run("rm -Rf ~/cpu2017/benchspec/C*/*/run")
 
 async def main():
     parser = ArgumentParser(
