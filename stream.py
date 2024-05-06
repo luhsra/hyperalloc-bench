@@ -211,7 +211,8 @@ async def main():
     parser.add_argument("--max-balloon", type=int, default=20)
     parser.add_argument("--shrink-target", type=int, default=2)
     parser.add_argument("--post-delay", default=20, type=int)
-    parser.add_argument("--deflate-delay", default=80, type=int)
+    parser.add_argument("--deflate-delay", default=90, type=int)
+    parser.add_argument("--vfio", type=int, help="IOMMU that shoud be passed into VM. This has to be bound to VFIO first!")
     Stream.args(parser)
     FTQ.args(parser)
     args, root = setup("stream", parser, custom="vm")
@@ -226,7 +227,7 @@ async def main():
             print("Starting qemu...")
             qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
                         extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, args.initial_balloon, args.max_balloon),
-                        env={**os.environ, "QEMU_LLFREE_LOG": str(res_dir / "llfree_log.txt")})
+                        env={**os.environ, "QEMU_LLFREE_LOG": str(res_dir / "llfree_log.txt")}, vfio_group=args.vfio)
             qemu_wait_startup(qemu, root / "boot.txt")
             ps_proc = Process(qemu.pid)
 
