@@ -68,34 +68,31 @@ def non_block_read(output: IO[str]) -> str:
 
 
 BALLOON_CFG = {
-    "base-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, False),
-    "base-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, True),
-    "huge-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, False),
-    "huge-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_virtio_balloon_args(cores, mem, True),
-    "llfree-manual": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, False),
-    "llfree-auto": lambda cores, mem, _inital_balloon, _max_balloon: qemu_llfree_balloon_args(cores, mem, True),
-    "virtio-mem-kernel": lambda _cores, mem, inital_balloon, max_balloon: qemu_virtio_mem_args(mem, inital_balloon, max_balloon, True),
-    "virtio-mem-movable": lambda _cores, mem, inital_balloon, max_balloon: qemu_virtio_mem_args(mem, inital_balloon, max_balloon, False),
+    "base-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
+    "base-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, True),
+    "huge-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
+    "huge-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, True),
+    "llfree-manual": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(cores, mem, False),
+    "llfree-auto": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(cores, mem, True),
+    "virtio-mem-kernel": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(mem, min_mem, init_mem, True),
+    "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(mem, min_mem, init_mem, False),
 }
 
 DEFAULT_KERNEL_CMD = "root=/dev/sda1 console=ttyS0 nokaslr"
 def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
-    api_mode_iothread = "api-triggered-mode-iothread"
     device = {
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
-        "kvm-map-ioctl": True,
+        "ioctl": True,
         "auto-mode-iothread": auto_mode_iothread,
-        "api-triggered-mode-iothread": api_mode_iothread,
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
     }
     return [
         "-m", f"{mem}G",
         "-append", DEFAULT_KERNEL_CMD,
         "-object", f"iothread,id={auto_mode_iothread}",
-        "-object", f"iothread,id={api_mode_iothread}",
         *chain(*[["-object", f"iothread,id={t}"] for t in per_core_iothreads]),
         "-device", json.dumps(device),
     ]
@@ -114,16 +111,16 @@ def vfio_args(iommu_group: int | None) -> List[str]:
 def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     return ["-m", f"{mem}G","-append", DEFAULT_KERNEL_CMD,"-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
 
-def qemu_virtio_mem_args(mem: int, inital_balloon: int, max_balloon: int, kernel: bool) -> List[str]:
+def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int, kernel: bool) -> List[str]:
     default_state = "online_kernel" if kernel else "online_movable"
-    max_mem = mem + max_balloon
-    extra_mem = max_balloon - inital_balloon
+    vmem_size = mem - min_mem
+    req_size = init_mem - min_mem
     return [
-        "-m", f"{mem}G,maxmem={max_mem}G",
+        "-m", f"{min_mem}G,maxmem={mem}G",
         "-append", f"{DEFAULT_KERNEL_CMD} memhp_default_state={default_state}",
         "-machine", "pc",
-        "-object", f"memory-backend-ram,id=vmem0,size={max_balloon}G,prealloc=off,reserve=off",
-        "-device", f"virtio-mem-pci,id=vm0,memdev=vmem0,node=0,requested-size={extra_mem}G,prealloc=off"
+        "-object", f"memory-backend-ram,id=vmem0,size={vmem_size}G,prealloc=off,reserve=off",
+        "-device", f"virtio-mem-pci,id=vm0,memdev=vmem0,node=0,requested-size={req_size}G,prealloc=off"
     ]
 
 
@@ -290,6 +287,7 @@ def sys_info() -> dict:
         "uname": check_output(["uname", "-a"], text=True),
         "lscpu": json.loads(check_output(["lscpu", "--json"]))["lscpu"],
         "meminfo": mem_info(),
+        "time": timestamp(),
     }
 
 

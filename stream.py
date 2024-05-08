@@ -225,8 +225,10 @@ async def main():
         print(f"----------Running with {bench_threads}/{args.cores}----------")
         try:
             print("Starting qemu...")
+            min_mem = args.mem - args.max_balloon
+            init_mem = args.mem - args.initial_balloon
             qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
-                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, args.initial_balloon, args.max_balloon),
+                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, init_mem),
                         env={**os.environ, "QEMU_LLFREE_LOG": str(res_dir / "llfree_log.txt")}, vfio_group=args.vfio)
             qemu_wait_startup(qemu, root / "boot.txt")
             ps_proc = Process(qemu.pid)

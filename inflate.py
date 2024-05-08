@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Action, Namespace
 import asyncio
 import shlex
 from subprocess import CalledProcessError
-from time import sleep
+from time import sleep, time
 from typing import Any, Sequence
 
 from utils import *
@@ -15,13 +15,13 @@ DEFAULTS = {
         "qemu": "/opt/ballooning/virtio-qemu-system",
         "kernel": "/opt/ballooning/buddy-bzImage",
     },
-    "virtio-mem": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
-    },
     "huge": {
         "qemu": "/opt/ballooning/virtio-huge-qemu-system",
         "kernel": "/opt/ballooning/buddy-huge-bzImage",
+    },
+    "virtio-mem": {
+        "qemu": "/opt/ballooning/virtio-qemu-system",
+        "kernel": "/opt/ballooning/buddy-bzImage",
     },
     "llfree": {
         "qemu": "/opt/ballooning/llfree-qemu-system",
@@ -108,9 +108,11 @@ async def main():
             "QEMU_LLFREE_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
             "QEMU_LLFREE_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
         }
+        # make it a little smaller to have some headroom
+        min_mem = args.shrink_target // 2
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
                        qmp_port=args.qmp,
-                       extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, 0, args.mem - args.shrink_target),
+                       extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, args.mem),
                        env=env, vfio_group=args.vfio)
         ps_proc = Process(qemu.pid)
 
@@ -132,23 +134,37 @@ async def main():
             target = args.shrink_target * 1024**3
 
             # Shrink / Inflate
+            start = time()
             await set_balloon(qmp, args.mode, target, target)
 
             # Wait until VM is smaller
             while (size := await query_balloon(qmp, args.mode, target)) > 1.01 * (target):
                 print("inflating", size)
                 sleep(1)
+            print("waited", time() - start, "s")
+
             # Wait a little longer
             sleep(args.delay)
 
-            print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target // 1024**2)
+            print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target // 1024**2, "time:")
 
             # Grow / Deflate
-            await set_balloon(qmp, args.mode, target, args.mem * 1024**3)
-            while (size := await query_balloon(qmp, args.mode, target)) < 0.99 * (args.mem * 1024**3):
+            start = time()
+            await set_balloon(qmp, args.mode, target, mem)
+            while (size := await query_balloon(qmp, args.mode, target)) < 0.99 * mem:
                 print("deflating", size)
                 sleep(1)
-            sleep(args.delay) # just hope that this is long enough (deflate is usually quite fast)
+            print("waited", time() - start, "s")
+
+            # Wait a little longer
+            sleep(args.delay)
+
+            output = rm_ansi_escape(non_block_read(qemu.stdout))
+            (root / f"out_{i}.txt").write_text(output)
+
+            if args.mode.startswith("virtio-mem"):
+                parse_virtio_mem_output(output, root / f"out_{i}.csv")
+
 
     except Exception as e:
         print(e)
@@ -165,6 +181,30 @@ async def main():
     print("terminate...")
     qemu.terminate()
     sleep(3)
+
+    if not args.mode.startswith("virtio-mem"):
+        parse_balloon_output(root)
+
+
+def parse_virtio_mem_output(output: str, outfile: Path):
+    start = []
+    end = []
+    for line in output.splitlines():
+        if " virtio_mem_config " in line:
+            start.append(int(line.rsplit(" ", 2)[1]))
+        if " virtio_mem_end " in line:
+            end.append(int(line.rsplit(" ", 2)[1]))
+    assert len(start) == 2 and len(end) == 2
+    outfile.write_text(f"shrink,grow\n{end[0] - start[0]},{end[1] - start[1]}")
+
+
+def parse_balloon_output(outfile: Path):
+    inflog = (outfile / "inf_log.txt").read_text().splitlines()[1:]
+    deflog = (outfile / "def_log.txt").read_text().splitlines()[1:]
+    for i, (infl, defl) in enumerate(zip(inflog, deflog)):
+        shrink = int(infl[:-1])
+        grow = int(defl[:-1])
+        (outfile / f"out_{i}.csv").write_text(f"shrink,grow\n{shrink},{grow}")
 
 
 if __name__ == "__main__":
