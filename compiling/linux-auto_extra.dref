@@ -3,10 +3,10 @@
 \drefset{linux-auto/Virtio Balloon/0/delay/gib}{1.98828125}
 \drefset{linux-auto/Virtio Balloon/clean/gib}{1.96484375}
 \drefset{linux-auto/Virtio Balloon/drop/gib}{1.767578125}
-\drefset{linux-auto/Virtio Balloon/drop/gib_m}{7.319784927368164}
+\drefset{linux-auto/Virtio Balloon/gib_m}{7.319784927368164}
 \drefset{linux-auto/LLFree Balloon/0/run/gib_m}{4.536609204610189}
 \drefset{linux-auto/LLFree Balloon/0/run/time}{136}
 \drefset{linux-auto/LLFree Balloon/0/delay/gib}{2.111328125}
 \drefset{linux-auto/LLFree Balloon/clean/gib}{1.94921875}
 \drefset{linux-auto/LLFree Balloon/drop/gib}{0.87109375}
-\drefset{linux-auto/LLFree Balloon/drop/gib_m}{7.207526143391927}
+\drefset{linux-auto/LLFree Balloon/gib_m}{7.207526143391927}
