@@ -92,6 +92,7 @@ async def main():
     parser.add_argument("--delay", type=int, default=10)
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
+    parser.add_argument("--nofault", action="store_true")
     parser.add_argument("--vfio", type=int)
     args, root = setup("inflate", parser, custom="vm")
 
@@ -128,35 +129,30 @@ async def main():
                 raise Exception("Qemu crashed")
 
             # Grow VM
-            ssh.run(f"./write -t{args.cores} -m{int((args.mem - 1) * 0.9)}")
+            if not args.nofault:
+                ssh.run(f"./write -t{args.cores} -m{int((args.mem - 1) * 0.9)}")
+
+            sleep(args.delay)
 
             mem = args.mem * 1024**3
             target = args.shrink_target * 1024**3
 
             # Shrink / Inflate
-            start = time()
             await set_balloon(qmp, args.mode, target, target)
 
             # Wait until VM is smaller
             while (size := await query_balloon(qmp, args.mode, target)) > 1.01 * (target):
                 print("inflating", size)
                 sleep(1)
-            print("waited", time() - start, "s")
-
-            # Wait a little longer
             sleep(args.delay)
 
-            print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target // 1024**2, "time:")
+            print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target // 1024**2)
 
             # Grow / Deflate
-            start = time()
             await set_balloon(qmp, args.mode, target, mem)
             while (size := await query_balloon(qmp, args.mode, target)) < 0.99 * mem:
                 print("deflating", size)
                 sleep(1)
-            print("waited", time() - start, "s")
-
-            # Wait a little longer
             sleep(args.delay)
 
             output = rm_ansi_escape(non_block_read(qemu.stdout))

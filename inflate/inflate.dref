@@ -1,36 +1,36 @@
-\drefset{inflate/llfree-balloon/0/grow}{9802.858390971076}
-\drefset{inflate/llfree-balloon/0/shrink}{426.7909595751872}
-\drefset{inflate/llfree-balloon/1/grow}{9760.751773101565}
-\drefset{inflate/llfree-balloon/1/shrink}{381.1034430981118}
-\drefset{inflate/llfree-balloon/2/grow}{9711.6313173403}
-\drefset{inflate/llfree-balloon/2/shrink}{379.40945818930294}
-\drefset{inflate/llfree-balloon-vfio/0/grow}{9803.050586804482}
-\drefset{inflate/llfree-balloon-vfio/0/shrink}{66.84865823921787}
-\drefset{inflate/llfree-balloon-vfio/1/grow}{9585.9067998229}
-\drefset{inflate/llfree-balloon-vfio/1/shrink}{65.12272277387568}
-\drefset{inflate/llfree-balloon-vfio/2/grow}{9764.135111219603}
-\drefset{inflate/llfree-balloon-vfio/2/shrink}{67.03921756518002}
-\drefset{inflate/virtio-balloon/0/grow}{2.791197493342343}
-\drefset{inflate/virtio-balloon/0/shrink}{1.54900137770477}
-\drefset{inflate/virtio-balloon/1/grow}{2.779024811607863}
-\drefset{inflate/virtio-balloon/1/shrink}{1.1594733490359206}
-\drefset{inflate/virtio-balloon/2/grow}{2.7837768851097278}
-\drefset{inflate/virtio-balloon/2/shrink}{1.119509036781829}
-\drefset{inflate/virtio-balloon-huge/0/grow}{390.4317286686893}
-\drefset{inflate/virtio-balloon-huge/0/shrink}{178.09947490152632}
-\drefset{inflate/virtio-balloon-huge/1/grow}{390.30131481047863}
-\drefset{inflate/virtio-balloon-huge/1/shrink}{180.7661781238511}
-\drefset{inflate/virtio-balloon-huge/2/grow}{391.306538292035}
-\drefset{inflate/virtio-balloon-huge/2/shrink}{178.99144918692852}
-\drefset{inflate/virtio-mem/0/grow}{127.66750988663179}
-\drefset{inflate/virtio-mem/0/shrink}{31.321152788888003}
-\drefset{inflate/virtio-mem/1/grow}{130.34733442389518}
-\drefset{inflate/virtio-mem/1/shrink}{43.617727248652024}
-\drefset{inflate/virtio-mem/2/grow}{126.84072247397377}
-\drefset{inflate/virtio-mem/2/shrink}{43.36296346308247}
-\drefset{inflate/virtio-mem-vfio/0/grow}{5.764430623924194}
-\drefset{inflate/virtio-mem-vfio/0/shrink}{22.864769433651407}
-\drefset{inflate/virtio-mem-vfio/1/grow}{5.739289659396561}
-\drefset{inflate/virtio-mem-vfio/1/shrink}{28.167810852826193}
-\drefset{inflate/virtio-mem-vfio/2/grow}{5.730075128669571}
-\drefset{inflate/virtio-mem-vfio/2/shrink}{27.989233276675833}
+\drefset{inflate/HyperAlloc/1/Grow}{9760.751773101565}
+\drefset{inflate/HyperAlloc/1/Shrink}{381.1034430981118}
+\drefset{inflate/HyperAlloc/1/Shrink Untouched}{6022.3595152903945}
+\drefset{inflate/HyperAlloc/2/Grow}{9711.6313173403}
+\drefset{inflate/HyperAlloc/2/Shrink}{379.40945818930294}
+\drefset{inflate/HyperAlloc/2/Shrink Untouched}{5951.579437590622}
+\drefset{inflate/HyperAlloc+VFIO/1/Grow}{9585.9067998229}
+\drefset{inflate/HyperAlloc+VFIO/1/Shrink}{65.12272277387568}
+\drefset{inflate/HyperAlloc+VFIO/1/Shrink Untouched}{6064.258398050341}
+\drefset{inflate/HyperAlloc+VFIO/2/Grow}{9764.135111219603}
+\drefset{inflate/HyperAlloc+VFIO/2/Shrink}{67.03921756518002}
+\drefset{inflate/HyperAlloc+VFIO/2/Shrink Untouched}{5956.604646002709}
+\drefset{inflate/virtio-balloon/1/Grow}{2.779024811607863}
+\drefset{inflate/virtio-balloon/1/Shrink}{1.1594733490359206}
+\drefset{inflate/virtio-balloon/1/Shrink Untouched}{2.013818060827443}
+\drefset{inflate/virtio-balloon/2/Grow}{2.7837768851097278}
+\drefset{inflate/virtio-balloon/2/Shrink}{1.119509036781829}
+\drefset{inflate/virtio-balloon/2/Shrink Untouched}{2.0132651825771726}
+\drefset{inflate/virtio-balloon-huge/1/Grow}{390.30131481047863}
+\drefset{inflate/virtio-balloon-huge/1/Shrink}{180.7661781238511}
+\drefset{inflate/virtio-balloon-huge/1/Shrink Untouched}{339.7241893963205}
+\drefset{inflate/virtio-balloon-huge/2/Grow}{391.306538292035}
+\drefset{inflate/virtio-balloon-huge/2/Shrink}{178.99144918692852}
+\drefset{inflate/virtio-balloon-huge/2/Shrink Untouched}{341.6937683214597}
+\drefset{inflate/virtio-mem/1/Grow}{130.34733442389518}
+\drefset{inflate/virtio-mem/1/Shrink}{43.617727248652024}
+\drefset{inflate/virtio-mem/1/Shrink Untouched}{51.68499896431338}
+\drefset{inflate/virtio-mem/2/Grow}{126.84072247397377}
+\drefset{inflate/virtio-mem/2/Shrink}{43.36296346308247}
+\drefset{inflate/virtio-mem/2/Shrink Untouched}{51.443329086622214}
+\drefset{inflate/virtio-mem+VFIO/1/Grow}{5.739289659396561}
+\drefset{inflate/virtio-mem+VFIO/1/Shrink}{28.167810852826193}
+\drefset{inflate/virtio-mem+VFIO/1/Shrink Untouched}{29.1786377423013}
+\drefset{inflate/virtio-mem+VFIO/2/Grow}{5.730075128669571}
+\drefset{inflate/virtio-mem+VFIO/2/Shrink}{27.989233276675833}
+\drefset{inflate/virtio-mem+VFIO/2/Shrink Untouched}{29.106119207924117}
