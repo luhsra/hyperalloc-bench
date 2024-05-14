@@ -4,6 +4,7 @@ import shlex
 from subprocess import CalledProcessError
 from time import sleep, time
 from typing import Any, Sequence
+import csv
 
 from utils import *
 from psutil import Process
@@ -130,18 +131,19 @@ async def main():
 
             # Grow VM
             if not args.nofault:
-                ssh.run(f"./write -t{args.cores} -m{int((args.mem - 1) * 0.9)}")
+                ssh.run(f"./write -t{args.cores} -m{args.mem - 1}")
 
             sleep(args.delay)
 
             mem = args.mem * 1024**3
             target = args.shrink_target * 1024**3
+            min_bytes = min_mem * 1024**3
 
             # Shrink / Inflate
-            await set_balloon(qmp, args.mode, target, target)
+            await set_balloon(qmp, args.mode, min_bytes, target)
 
             # Wait until VM is smaller
-            while (size := await query_balloon(qmp, args.mode, target)) > 1.01 * (target):
+            while (size := await query_balloon(qmp, args.mode, min_bytes)) > 1.01 * (target):
                 print("inflating", size)
                 sleep(1)
             sleep(args.delay)
@@ -149,17 +151,22 @@ async def main():
             print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target // 1024**2)
 
             # Grow / Deflate
-            await set_balloon(qmp, args.mode, target, mem)
-            while (size := await query_balloon(qmp, args.mode, target)) < 0.99 * mem:
+            await set_balloon(qmp, args.mode, min_bytes, mem)
+            while (size := await query_balloon(qmp, args.mode, min_bytes)) < 0.99 * mem:
                 print("deflating", size)
                 sleep(1)
             sleep(args.delay)
 
+            touch = 0
+            if not args.nofault:
+                write_out = ssh.output(f"./write -t1 -m{args.mem - 1}")
+                touch = parse_write_output(write_out) * 1000_000 # to ns
+
             output = rm_ansi_escape(non_block_read(qemu.stdout))
             (root / f"out_{i}.txt").write_text(output)
 
-            if args.mode.startswith("virtio-mem"):
-                parse_virtio_mem_output(output, root / f"out_{i}.csv")
+            shrink, grow = parse_output(output, args.mode)
+            (root / f"out_{i}.csv").write_text(f"shrink,grow,touch\n{shrink},{grow},{touch}")
 
 
     except Exception as e:
@@ -178,29 +185,34 @@ async def main():
     qemu.terminate()
     sleep(3)
 
-    if not args.mode.startswith("virtio-mem"):
-        parse_balloon_output(root)
+
+def parse_write_output(output: str) -> int:
+    reader = csv.DictReader(output.splitlines())
+    return int(next(reader)["aavg"])
 
 
-def parse_virtio_mem_output(output: str, outfile: Path):
+def parse_output(output: str, mode: str) -> Tuple[int,int]:
+    match mode:
+        case "base-manual" | "huge-manual":
+            return parse_output_with(output, " virtio_balloon_start ", " virtio_balloon_end ")
+        case "llfree-manual":
+            return parse_output_with(output, " llfree_balloon_start ", " llfree_balloon_end ")
+        case "virtio-mem-kernel" | "virtio-mem-movable":
+            return parse_output_with(output, " virtio_mem_config ", " virtio_mem_end ")
+        case _: assert False, "Invalid Mode"
+
+
+def parse_output_with(output: str, start_marker: str, end_marker: str) -> Tuple[int,int]:
     start = []
     end = []
     for line in output.splitlines():
-        if " virtio_mem_config " in line:
+        if start_marker in line:
             start.append(int(line.rsplit(" ", 2)[1]))
-        if " virtio_mem_end " in line:
+        if end_marker in line:
             end.append(int(line.rsplit(" ", 2)[1]))
     assert len(start) == 2 and len(end) == 2
-    outfile.write_text(f"shrink,grow\n{end[0] - start[0]},{end[1] - start[1]}")
+    return end[0] - start[0], end[1] - start[1]
 
-
-def parse_balloon_output(outfile: Path):
-    inflog = (outfile / "inf_log.txt").read_text().splitlines()[1:]
-    deflog = (outfile / "def_log.txt").read_text().splitlines()[1:]
-    for i, (infl, defl) in enumerate(zip(inflog, deflog)):
-        shrink = int(infl[:-1])
-        grow = int(defl[:-1])
-        (outfile / f"out_{i}.csv").write_text(f"shrink,grow\n{shrink},{grow}")
 
 
 if __name__ == "__main__":
