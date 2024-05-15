@@ -158,15 +158,18 @@ async def main():
             sleep(args.delay)
 
             touch = 0
+            touch2 = 0
             if not args.nofault:
-                write_out = ssh.output(f"./write -t1 -m{args.mem - 1}")
+                write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
                 touch = parse_write_output(write_out) * 1000_000 # to ns
+                write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
+                touch2 = parse_write_output(write_out) * 1000_000 # to ns
 
             output = rm_ansi_escape(non_block_read(qemu.stdout))
             (root / f"out_{i}.txt").write_text(output)
 
             shrink, grow = parse_output(output, args.mode)
-            (root / f"out_{i}.csv").write_text(f"shrink,grow,touch\n{shrink},{grow},{touch}")
+            (root / f"out_{i}.csv").write_text(f"shrink,grow,touch,touch2\n{shrink},{grow},{touch},{touch2}")
 
 
     except Exception as e:

@@ -1,48 +1,48 @@
-\drefset{inflate/HyperAlloc/1/Access}{1.2133161446879503}
 \drefset{inflate/HyperAlloc/1/Reclaim}{395.86591289178415}
 \drefset{inflate/HyperAlloc/1/Reclaim Untouched}{6022.3595152903945}
 \drefset{inflate/HyperAlloc/1/Return}{10183.254020635091}
-\drefset{inflate/HyperAlloc/2/Access}{1.2106537530266344}
+\drefset{inflate/HyperAlloc/1/Return + Access}{298151.27179950115}
 \drefset{inflate/HyperAlloc/2/Reclaim}{442.8843719419353}
 \drefset{inflate/HyperAlloc/2/Reclaim Untouched}{5951.579437590622}
 \drefset{inflate/HyperAlloc/2/Return}{9896.972516107324}
-\drefset{inflate/HyperAlloc+VFIO/1/Access}{1.169505153132081}
+\drefset{inflate/HyperAlloc/2/Return + Access}{297496.1493926709}
 \drefset{inflate/HyperAlloc+VFIO/1/Reclaim}{65.50261773638043}
 \drefset{inflate/HyperAlloc+VFIO/1/Reclaim Untouched}{6064.258398050341}
 \drefset{inflate/HyperAlloc+VFIO/1/Return}{10271.184960930981}
-\drefset{inflate/HyperAlloc+VFIO/2/Access}{1.171303074670571}
+\drefset{inflate/HyperAlloc+VFIO/1/Return + Access}{287386.9089420278}
 \drefset{inflate/HyperAlloc+VFIO/2/Reclaim}{67.36557042533569}
 \drefset{inflate/HyperAlloc+VFIO/2/Reclaim Untouched}{5956.604646002709}
 \drefset{inflate/HyperAlloc+VFIO/2/Return}{10243.107349045407}
-\drefset{inflate/virtio-balloon/1/Access}{0.6578676863615804}
+\drefset{inflate/HyperAlloc+VFIO/2/Return + Access}{287828.5874082352}
 \drefset{inflate/virtio-balloon/1/Reclaim}{1.1477091161834352}
 \drefset{inflate/virtio-balloon/1/Reclaim Untouched}{2.013818060827443}
 \drefset{inflate/virtio-balloon/1/Return}{2.807343110455136}
-\drefset{inflate/virtio-balloon/2/Access}{0.6568144499178982}
+\drefset{inflate/virtio-balloon/1/Return + Access}{132556.0521050696}
 \drefset{inflate/virtio-balloon/2/Reclaim}{1.1353865729971835}
 \drefset{inflate/virtio-balloon/2/Reclaim Untouched}{2.0132651825771726}
 \drefset{inflate/virtio-balloon/2/Return}{2.802226534873768}
-\drefset{inflate/virtio-balloon-huge/1/Access}{1.2878300064391501}
+\drefset{inflate/virtio-balloon/2/Return + Access}{132338.5403094746}
 \drefset{inflate/virtio-balloon-huge/1/Reclaim}{174.86780267348826}
 \drefset{inflate/virtio-balloon-huge/1/Reclaim Untouched}{339.7241893963205}
 \drefset{inflate/virtio-balloon-huge/1/Return}{388.8928790918671}
-\drefset{inflate/virtio-balloon-huge/2/Access}{1.2874155133569358}
+\drefset{inflate/virtio-balloon-huge/1/Return + Access}{315517.5597111608}
 \drefset{inflate/virtio-balloon-huge/2/Reclaim}{170.81938192721972}
 \drefset{inflate/virtio-balloon-huge/2/Reclaim Untouched}{341.6937683214597}
 \drefset{inflate/virtio-balloon-huge/2/Return}{387.48498102159107}
-\drefset{inflate/virtio-mem/1/Access}{1.2774451097804391}
+\drefset{inflate/virtio-balloon-huge/2/Return + Access}{315412.7775895074}
 \drefset{inflate/virtio-mem/1/Reclaim}{36.00085898049527}
 \drefset{inflate/virtio-mem/1/Reclaim Untouched}{51.68499896431338}
 \drefset{inflate/virtio-mem/1/Return}{124.64662292878991}
-\drefset{inflate/virtio-mem/2/Access}{1.271556862433442}
+\drefset{inflate/virtio-mem/1/Return + Access}{310957.23299195303}
 \drefset{inflate/virtio-mem/2/Reclaim}{40.61102990089619}
 \drefset{inflate/virtio-mem/2/Reclaim Untouched}{51.443329086622214}
 \drefset{inflate/virtio-mem/2/Return}{125.19496474928413}
-\drefset{inflate/virtio-mem+VFIO/1/Access}{1.333777925975325}
+\drefset{inflate/virtio-mem/2/Return + Access}{309550.33040394075}
 \drefset{inflate/virtio-mem+VFIO/1/Reclaim}{24.601570909016345}
 \drefset{inflate/virtio-mem+VFIO/1/Reclaim Untouched}{29.1786377423013}
 \drefset{inflate/virtio-mem+VFIO/1/Return}{5.720507763481281}
-\drefset{inflate/virtio-mem+VFIO/2/Access}{1.3143842931076974}
+\drefset{inflate/virtio-mem+VFIO/1/Return + Access}{268991.7249421045}
 \drefset{inflate/virtio-mem+VFIO/2/Reclaim}{26.863515388602767}
 \drefset{inflate/virtio-mem+VFIO/2/Reclaim Untouched}{29.106119207924117}
 \drefset{inflate/virtio-mem+VFIO/2/Return}{5.75857414502402}
+\drefset{inflate/virtio-mem+VFIO/2/Return + Access}{266085.40833222814}
