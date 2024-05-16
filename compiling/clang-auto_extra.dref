@@ -1,12 +1,12 @@
-\drefset{clang-auto/Virtio Balloon/0/run/gib_m}{269.60838680267335}
-\drefset{clang-auto/Virtio Balloon/0/run/time}{1495}
-\drefset{clang-auto/Virtio Balloon/0/delay/gib}{12.162109375}
-\drefset{clang-auto/Virtio Balloon/clean/gib}{11.462890625}
-\drefset{clang-auto/Virtio Balloon/drop/gib}{8.92578125}
-\drefset{clang-auto/Virtio Balloon/gib_m}{380.065033976237}
-\drefset{clang-auto/LLFree Balloon/0/run/gib_m}{223.69569562276203}
-\drefset{clang-auto/LLFree Balloon/0/run/time}{1475}
-\drefset{clang-auto/LLFree Balloon/0/delay/gib}{10.84765625}
-\drefset{clang-auto/LLFree Balloon/clean/gib}{7.419921875}
-\drefset{clang-auto/LLFree Balloon/drop/gib}{2.17578125}
-\drefset{clang-auto/LLFree Balloon/gib_m}{293.543558883667}
+\drefset{clang-auto/virtio-balloon/0/run/gib_m}{269.60838680267335}
+\drefset{clang-auto/virtio-balloon/0/run/time}{1495}
+\drefset{clang-auto/virtio-balloon/0/delay/gib}{12.162109375}
+\drefset{clang-auto/virtio-balloon/clean/gib}{11.462890625}
+\drefset{clang-auto/virtio-balloon/drop/gib}{8.92578125}
+\drefset{clang-auto/virtio-balloon/gib_m}{380.065033976237}
+\drefset{clang-auto/HyperAlloc/0/run/gib_m}{223.69569562276203}
+\drefset{clang-auto/HyperAlloc/0/run/time}{1475}
+\drefset{clang-auto/HyperAlloc/0/delay/gib}{10.84765625}
+\drefset{clang-auto/HyperAlloc/clean/gib}{7.419921875}
+\drefset{clang-auto/HyperAlloc/drop/gib}{2.17578125}
+\drefset{clang-auto/HyperAlloc/gib_m}{293.543558883667}
