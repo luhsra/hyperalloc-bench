@@ -94,6 +94,7 @@ async def main():
     parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
                         required=True, action=ModeAction)
     parser.add_argument("--nofault", action="store_true")
+    parser.add_argument("--module")
     parser.add_argument("--vfio", type=int)
     args, root = setup("inflate", parser, custom="vm")
 
@@ -111,7 +112,7 @@ async def main():
             "QEMU_LLFREE_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
         }
         # make it a little smaller to have some headroom
-        min_mem = args.shrink_target // 2
+        min_mem = args.shrink_target
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
                        qmp_port=args.qmp,
                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, args.mem),
@@ -120,6 +121,11 @@ async def main():
 
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
         qemu_wait_startup(qemu, root / "boot.txt")
+
+        if not args.nofault and args.module:
+            name = Path(args.module).name
+            ssh.upload(args.module, name)
+            ssh.run(f"sudo insmod {name}")
 
         qmp = QMPClient("STREAM machine")
         await qmp.connect(("127.0.0.1", args.qmp))
@@ -159,11 +165,16 @@ async def main():
 
             touch = 0
             touch2 = 0
-            if not args.nofault:
-                write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
-                touch = parse_write_output(write_out) * 1000_000 # to ns
-                write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
-                touch2 = parse_write_output(write_out) * 1000_000 # to ns
+            if not args.nofault and args.module:
+                allocs = int(args.mem - 1) * 1024**3 // 4096
+                ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
+                touch = parse_module_output(ssh.output("sudo cat /proc/alloc/out")) * allocs
+                ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
+                touch2 = parse_module_output(ssh.output("sudo cat /proc/alloc/out")) * allocs
+                # write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
+                # touch = parse_write_output(write_out) * 1000_000 # to ns
+                # write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
+                # touch2 = parse_write_output(write_out) * 1000_000 # to ns
 
             output = rm_ansi_escape(non_block_read(qemu.stdout))
             (root / f"out_{i}.txt").write_text(output)
@@ -174,12 +185,12 @@ async def main():
 
     except Exception as e:
         print(e)
+        (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
         if isinstance(e, CalledProcessError):
-            with (root / f"error_{i}.txt").open("w+") as f:
+            with (root / f"error.txt").open("a+") as f:
                 if e.stdout: f.write(e.stdout)
                 if e.stderr: f.write(e.stderr)
 
-        (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
         qemu.terminate()
         raise e
 
@@ -187,6 +198,12 @@ async def main():
     print("terminate...")
     qemu.terminate()
     sleep(3)
+
+
+def parse_module_output(output: str) -> int:
+    print(output)
+    reader = csv.DictReader(output.splitlines())
+    return int(next(reader)["get_avg"])
 
 
 def parse_write_output(output: str) -> int:
@@ -201,7 +218,7 @@ def parse_output(output: str, mode: str) -> Tuple[int,int]:
         case "llfree-manual":
             return parse_output_with(output, " llfree_balloon_start ", " llfree_balloon_end ")
         case "virtio-mem-kernel" | "virtio-mem-movable":
-            return parse_output_with(output, " virtio_mem_config ", " virtio_mem_end ")
+            return parse_output_with(output, " virtio_mem_config at ", " virtio_mem_end ")
         case _: assert False, "Invalid Mode"
 
 
