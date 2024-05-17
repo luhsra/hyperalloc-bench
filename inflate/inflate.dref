@@ -1,47 +1,59 @@
+\drefset{inflate/HyperAlloc/1/Install}{4.015470805921052}
 \drefset{inflate/HyperAlloc/1/Reclaim}{331.8902854352703}
 \drefset{inflate/HyperAlloc/1/Reclaim Untouched}{5062.306872992795}
 \drefset{inflate/HyperAlloc/1/Return}{8525.418107817553}
 \drefset{inflate/HyperAlloc/1/Return + Install}{4.013580410076524}
+\drefset{inflate/HyperAlloc/2/Install}{4.007034942883403}
 \drefset{inflate/HyperAlloc/2/Reclaim}{367.98355407900107}
 \drefset{inflate/HyperAlloc/2/Reclaim Untouched}{5002.447447413648}
 \drefset{inflate/HyperAlloc/2/Return}{8519.897795306048}
 \drefset{inflate/HyperAlloc/2/Return + Install}{4.0051512605390736}
+\drefset{inflate/HyperAlloc+VFIO/1/Install}{3.605573975070888}
 \drefset{inflate/HyperAlloc+VFIO/1/Reclaim}{54.19715387548618}
 \drefset{inflate/HyperAlloc+VFIO/1/Reclaim Untouched}{5116.0433748389405}
 \drefset{inflate/HyperAlloc+VFIO/1/Return}{8576.818489219153}
 \drefset{inflate/HyperAlloc+VFIO/1/Return + Install}{3.6040588793607036}
+\drefset{inflate/HyperAlloc+VFIO/2/Install}{3.622694459283001}
 \drefset{inflate/HyperAlloc+VFIO/2/Reclaim}{55.93988744447127}
 \drefset{inflate/HyperAlloc+VFIO/2/Reclaim Untouched}{5013.765292610862}
 \drefset{inflate/HyperAlloc+VFIO/2/Return}{8558.471046264527}
 \drefset{inflate/HyperAlloc+VFIO/2/Return + Install}{3.6211616665406257}
+\drefset{inflate/virtio-balloon/1/Install}{1.0025485586399474}
 \drefset{inflate/virtio-balloon/1/Reclaim}{0.9165784460408831}
 \drefset{inflate/virtio-balloon/1/Reclaim Untouched}{1.6768070376144044}
 \drefset{inflate/virtio-balloon/1/Return}{2.3077690383500227}
 \drefset{inflate/virtio-balloon/1/Return + Install}{0.6989210114387471}
+\drefset{inflate/virtio-balloon/2/Install}{1.0009701562909998}
 \drefset{inflate/virtio-balloon/2/Reclaim}{0.9348251358044232}
 \drefset{inflate/virtio-balloon/2/Reclaim Untouched}{1.675952370017211}
 \drefset{inflate/virtio-balloon/2/Return}{2.303212229395179}
 \drefset{inflate/virtio-balloon/2/Return + Install}{0.6977359104679879}
+\drefset{inflate/virtio-balloon-huge/1/Install}{4.305527387838601}
 \drefset{inflate/virtio-balloon-huge/1/Reclaim}{136.52594989346096}
 \drefset{inflate/virtio-balloon-huge/1/Reclaim Untouched}{289.2860551783354}
 \drefset{inflate/virtio-balloon-huge/1/Return}{322.14960898446907}
 \drefset{inflate/virtio-balloon-huge/1/Return + Install}{4.248742966268688}
+\drefset{inflate/virtio-balloon-huge/2/Install}{4.286176702949438}
 \drefset{inflate/virtio-balloon-huge/2/Reclaim}{132.48972181172857}
 \drefset{inflate/virtio-balloon-huge/2/Reclaim Untouched}{289.94946992597704}
 \drefset{inflate/virtio-balloon-huge/2/Return}{323.05665872674166}
 \drefset{inflate/virtio-balloon-huge/2/Return + Install}{4.230054164923545}
+\drefset{inflate/virtio-mem/1/Install}{4.2058404251653805}
 \drefset{inflate/virtio-mem/1/Reclaim}{34.68711994081462}
 \drefset{inflate/virtio-mem/1/Reclaim Untouched}{41.852060220084034}
 \drefset{inflate/virtio-mem/1/Return}{101.88130191568685}
 \drefset{inflate/virtio-mem/1/Return + Install}{4.039099260386701}
+\drefset{inflate/virtio-mem/2/Install}{4.169068049863387}
 \drefset{inflate/virtio-mem/2/Reclaim}{34.908290440411434}
 \drefset{inflate/virtio-mem/2/Reclaim Untouched}{42.339033720408985}
 \drefset{inflate/virtio-mem/2/Return}{102.7641733426898}
 \drefset{inflate/virtio-mem/2/Return + Install}{4.006526185630681}
+\drefset{inflate/virtio-mem+VFIO/1/Install}{13.672750056003585}
 \drefset{inflate/virtio-mem+VFIO/1/Reclaim}{22.427559412026227}
 \drefset{inflate/virtio-mem+VFIO/1/Reclaim Untouched}{23.787602797263187}
 \drefset{inflate/virtio-mem+VFIO/1/Return}{4.720765206166917}
 \drefset{inflate/virtio-mem+VFIO/1/Return + Install}{3.5091629749397804}
+\drefset{inflate/virtio-mem+VFIO/2/Install}{13.479495638250881}
 \drefset{inflate/virtio-mem+VFIO/2/Reclaim}{22.412622279653124}
 \drefset{inflate/virtio-mem+VFIO/2/Reclaim Untouched}{23.903419800360982}
 \drefset{inflate/virtio-mem+VFIO/2/Return}{4.750522821401897}
