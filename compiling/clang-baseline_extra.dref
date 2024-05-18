@@ -1,0 +1,12 @@
+\drefset{clang-baseline/Buddy Baseline/0/run/gib_m}{305.3076363245646}
+\drefset{clang-baseline/Buddy Baseline/0/run/time}{1508}
+\drefset{clang-baseline/Buddy Baseline/0/delay/gib}{12.646484375}
+\drefset{clang-baseline/Buddy Baseline/clean/gib}{12.01953125}
+\drefset{clang-baseline/Buddy Baseline/drop/gib}{9.046875}
+\drefset{clang-baseline/Buddy Baseline/gib_m}{465.76354529062905}
+\drefset{clang-baseline/HyperAlloc Baseline/0/run/gib_m}{306.97120933532716}
+\drefset{clang-baseline/HyperAlloc Baseline/0/run/time}{1478}
+\drefset{clang-baseline/HyperAlloc Baseline/0/delay/gib}{10.66015625}
+\drefset{clang-baseline/HyperAlloc Baseline/clean/gib}{7.439453125}
+\drefset{clang-baseline/HyperAlloc Baseline/drop/gib}{2.173828125}
+\drefset{clang-baseline/HyperAlloc Baseline/gib_m}{466.2270037333171}
