@@ -30,32 +30,6 @@ DEFAULTS = {
     },
 }
 
-async def set_balloon(qmp: QMPClient, mode: str, min_bytes: int, target_bytes: int) -> any:
-    assert target_bytes >= min_bytes
-    match mode:
-        case "base-manual" | "huge-manual":
-            await qmp.execute("balloon", {"value" : target_bytes})
-        case "llfree-manual" | "llfree-manual-map":
-            await qmp.execute("llfree-balloon", {"value" : target_bytes})
-        case "virtio-mem-kernel" | "virtio-mem-movable":
-            await qmp.execute("qom-set", {"path": "vm0",
-                                    "property": "requested-size",
-                                    "value" : target_bytes - min_bytes})
-        case _: assert False, "Invalid Mode"
-
-
-async def query_balloon(qmp: QMPClient, mode: str, min_bytes: int) -> int:
-    match mode:
-        case "base-manual" | "huge-manual":
-            return (await qmp.execute("query-balloon"))["actual"]
-        case "llfree-manual" | "llfree-manual-map":
-            return (await qmp.execute("query-llfree-balloon"))["actual"]
-        case "virtio-mem-kernel" | "virtio-mem-movable":
-            return min_bytes + (await qmp.execute("qom-get", {"path": "vm0",
-                                    "property": "size"}))
-        case _: assert False, "Invalid Mode"
-
-
 class ModeAction(Action):
     def __init__(self, option_strings: Sequence[str], dest: str,
                  nargs: int | str | None = None, **kwargs) -> None:
@@ -102,6 +76,7 @@ async def main():
 
     print("Running")
 
+    qemu = None
     try:
         print("start qemu...")
         env = {
@@ -129,6 +104,12 @@ async def main():
 
         qmp = QMPClient("STREAM machine")
         await qmp.connect(("127.0.0.1", args.qmp))
+
+        logfile = (root / "out.txt").open("w+")
+
+        outfile = (root / "out.csv").open("w+")
+        outfile.write("shrink,grow,touch,touch2\n")
+        outfile.flush()
 
         print(f"Exec c={args.cores}")
         for i in range(args.iter):
@@ -171,33 +152,53 @@ async def main():
                 touch = parse_module_output(ssh.output("sudo cat /proc/alloc/out")) * allocs
                 ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
                 touch2 = parse_module_output(ssh.output("sudo cat /proc/alloc/out")) * allocs
-                # write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
-                # touch = parse_write_output(write_out) * 1000_000 # to ns
-                # write_out = ssh.output(f"./write -t1 --huge -m{args.mem - 1}")
-                # touch2 = parse_write_output(write_out) * 1000_000 # to ns
 
             output = rm_ansi_escape(non_block_read(qemu.stdout))
-            (root / f"out_{i}.txt").write_text(output)
+            logfile.write(output)
+            logfile.flush()
 
             shrink, grow = parse_output(output, args.mode)
-            (root / f"out_{i}.csv").write_text(f"shrink,grow,touch,touch2\n{shrink},{grow},{touch},{touch2}")
+            outfile.write(f"{shrink},{grow},{touch},{touch2}\n")
+            outfile.flush()
 
-
+        logfile.write(rm_ansi_escape(non_block_read(qemu.stdout)))
     except Exception as e:
         print(e)
-        (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
+        errfile = (root / "error.txt").open("w+")
+        errfile.write(rm_ansi_escape(non_block_read(qemu.stdout)))
         if isinstance(e, CalledProcessError):
-            with (root / f"error.txt").open("a+") as f:
-                if e.stdout: f.write(e.stdout)
-                if e.stderr: f.write(e.stderr)
+            if e.stdout: errfile.write(e.stdout)
+            if e.stderr: errfile.write(e.stderr)
 
-        qemu.terminate()
-        raise e
-
-    (root / "out.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
     print("terminate...")
-    qemu.terminate()
+    if qemu: qemu.terminate()
     sleep(3)
+
+
+async def set_balloon(qmp: QMPClient, mode: str, min_bytes: int, target_bytes: int) -> any:
+    assert target_bytes >= min_bytes
+    match mode:
+        case "base-manual" | "huge-manual":
+            await qmp.execute("balloon", {"value" : target_bytes})
+        case "llfree-manual" | "llfree-manual-map":
+            await qmp.execute("llfree-balloon", {"value" : target_bytes})
+        case "virtio-mem-kernel" | "virtio-mem-movable":
+            await qmp.execute("qom-set", {"path": "vm0",
+                                    "property": "requested-size",
+                                    "value" : target_bytes - min_bytes})
+        case _: assert False, "Invalid Mode"
+
+
+async def query_balloon(qmp: QMPClient, mode: str, min_bytes: int) -> int:
+    match mode:
+        case "base-manual" | "huge-manual":
+            return (await qmp.execute("query-balloon"))["actual"]
+        case "llfree-manual" | "llfree-manual-map":
+            return (await qmp.execute("query-llfree-balloon"))["actual"]
+        case "virtio-mem-kernel" | "virtio-mem-movable":
+            return min_bytes + (await qmp.execute("qom-get", {"path": "vm0",
+                                    "property": "size"}))
+        case _: assert False, "Invalid Mode"
 
 
 def parse_module_output(output: str) -> int:
@@ -232,7 +233,6 @@ def parse_output_with(output: str, start_marker: str, end_marker: str) -> Tuple[
             end.append(int(line.rsplit(" ", 2)[1]))
     assert len(start) == 2 and len(end) == 2
     return end[0] - start[0], end[1] - start[1]
-
 
 
 if __name__ == "__main__":
