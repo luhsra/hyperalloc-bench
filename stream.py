@@ -205,6 +205,7 @@ async def main():
     parser.add_argument("--bench-iters", type=int, default=400) # per core
     parser.add_argument("--bench-threads", type=int, nargs='+')
     parser.add_argument('--ftq', action="store_true")
+    parser.add_argument('--baseline', action="store_true")
     parser.add_argument("--workload-mem", type=int, default=19)
     parser.add_argument("--workload-time", type=int, default=180) # only for spec
     parser.add_argument("--initial-balloon", type=int, default=0)
@@ -262,15 +263,16 @@ async def main():
             bench_handle = bench.run()
             bench_start_time = time()
             sleep(args.post_delay)
-            res = await SET_BALLOON[args.mode](args.shrink_target, qmp)
-            print(f"Balloon returned {res}")
+            if not args.baseline:
+                res = await SET_BALLOON[args.mode](args.shrink_target, qmp)
+                print(f"Balloon returned {res}")
 
-            # Deflate balloon again
-            sleep(args.deflate_delay - (time() - bench_start_time))
-            if bench_handle.poll() is not None:
-                print("Warning: Bench was done before deflation started")
-            await SET_BALLOON[args.mode](18, qmp)
-            print("Deflating balloon again")
+                # Deflate balloon again
+                sleep(args.deflate_delay - (time() - bench_start_time))
+                if bench_handle.poll() is not None:
+                    print("Warning: Bench was done before deflation started")
+                await SET_BALLOON[args.mode](18, qmp)
+                print("Deflating balloon again")
 
 
             # Wait for bench to be done

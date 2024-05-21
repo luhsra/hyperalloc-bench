@@ -1,0 +1,1 @@
+/opt/ballooning/virtio-qemu-system -smp 12 -hda /opt/ballooning/debian.img -serial mon:stdio -nographic -kernel /opt/ballooning/buddy-bzImage -qmp tcp:localhost:5323,server=on,wait=off -nic user,hostfwd=tcp:127.0.0.1:5322-:22 -no-reboot --cpu host -m 20G -append 'root=/dev/sda1 console=ttyS0 nokaslr' -device '{"driver": "virtio-balloon", "free-page-reporting": false}' -enable-kvm
