@@ -78,7 +78,7 @@ BALLOON_CFG = {
     "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(mem, min_mem, init_mem, False),
 }
 
-DEFAULT_KERNEL_CMD = "root=/dev/sda1 console=ttyS0 nokaslr"
+DEFAULT_KERNEL_CMD = "root=/dev/sda3 console=ttyS0 nokaslr"
 def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
@@ -113,8 +113,8 @@ def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
 
 def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int, kernel: bool) -> List[str]:
     default_state = "online_kernel" if kernel else "online_movable"
-    vmem_size = mem - min_mem
-    req_size = init_mem - min_mem
+    vmem_size = round(mem - min_mem)
+    req_size = round(init_mem - min_mem)
     return [
         "-m", f"{min_mem}G,maxmem={mem}G",
         "-append", f"{DEFAULT_KERNEL_CMD} memhp_default_state={default_state}",
@@ -140,19 +140,9 @@ def qemu_vm(
     """Start a vm with the given configuration."""
     assert cores > 0 and cores % sockets == 0
     assert cores <= psutil.cpu_count()
-    #assert mem > 0 and mem % sockets == 0
     assert Path(hda).exists()
 
     assert sockets == 1, "not supported"
-
-    # every nth cpu
-    # def cpus(i) -> str:
-    #     return ",".join([
-    #         f"cpus={c}" for c in range(i, cores, sockets)
-    #     ])
-
-    # max_mem = mem + sockets
-    # slots = sockets
 
     if not extra_args:
         extra_args = []
@@ -160,9 +150,7 @@ def qemu_vm(
     args = [
         qemu,
         #"-m", f"{mem}G",
-        # "-m", f"{mem}G,slots={slots},maxmem={max_mem}G",
         "-smp", f"{cores}",
-        # "-smp", f"{cores},sockets={sockets},maxcpus={cores}",
         "-hda", hda,
         "-serial", "mon:stdio",
         "-nographic",
@@ -171,10 +159,6 @@ def qemu_vm(
         "-nic", f"user,hostfwd=tcp:127.0.0.1:{port}-:22",
         "-no-reboot",
         "--cpu", "host",
-        # *chain(*[["-numa", f"node,{cpus(i)},nodeid={i},memdev=m{i}"]
-        #          for i in range(sockets)]),
-        # *chain(*[["-object", f"memory-backend-ram,size={mem // sockets}G,id=m{i}"]
-        #          for i in range(sockets)]),
         *extra_args,
         *vfio_args(vfio_group)
     ]
