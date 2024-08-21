@@ -3,12 +3,13 @@ import asyncio
 import shlex
 from subprocess import CalledProcessError
 from time import sleep, time
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from utils import *
 from psutil import Process
 import signal
 from qemu.qmp import QMPClient
+from vm_resize import VMResize
 
 # virtio-mem: Time between plug/unplug requests
 PLUGGING_FREQ = 5
@@ -102,17 +103,10 @@ async def main():
 
     try:
         print("start qemu...")
-        env = {
-            **os.environ,
-            "QEMU_VIRTIO_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
-            "QEMU_VIRTIO_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
-            "QEMU_LLFREE_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
-            "QEMU_LLFREE_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
-        }
         min_mem = round(args.mem / 8)
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
                        extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem),
-                       env=env, vfio_group=args.vfio)
+                       vfio_group=args.vfio)
         ps_proc = Process(qemu.pid)
 
         print("started")
@@ -122,7 +116,7 @@ async def main():
 
         client = QMPClient("compile vm")
         await client.connect(("127.0.0.1", args.qmp))
-        qmp = QMPWrap(client, args.mem * 1024**3, min_mem * 1024**3)
+        vm_resize = VMResize(client, "virtio-mem-movable", args.mem * 1024**3, min_mem * 1024**3)
 
         for i in range(args.iter):
             if qemu.poll() is not None:
@@ -131,7 +125,6 @@ async def main():
             print(f"Exec i={i} c={args.cores}")
 
             mem_usage = (root / f"out_{i}.csv").open("w+")
-            mem_usage.write("rss,small,huge,cached,total\n")
 
             if "clean" in TARGET[args.target]:
                 ssh.run(TARGET[args.target]["clean"])
@@ -145,33 +138,25 @@ async def main():
                 # NOTE: The --filter arg is not documented for perf stat, but does seem to work anyways. Not sure if this is a bug...
                 perf = Popen(shlex.split(f"perf stat -e \"kvm:kvm_exit\" --filter \"exit_reason==48\" -e \"dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses\" -j -p {qemu.pid}"), stderr=perf_file)
 
-            measure = Messure(i, ssh, qmp, ps_proc, root, mem_usage, args)
+            measure = Messure(i, ssh, vm_resize, ps_proc, root, mem_usage, args)
 
-            await measure(0)
-
-            sec = 1
+            await measure()
 
             build_end = []
             delay_end = []
 
             for r in range(args.repeat):
                 # Compilation
+                print("start compile")
                 process = ssh.background(TARGET[args.target]["build"])
 
-                while process.poll() is None:
-                    await measure(sec, process)
-                    sleep(1)
-                    sec += 1
-                build_end.append(sec)
+                build_time = await measure.wait(condition=lambda: process.poll() is None, process=process)
+                build_end.append(build_time)
                 with (root / f"out_{i}.txt").open("a+") as f:
                     f.write(process.stdout.read())
 
                 # Delay after the compilation
-                for s in range(sec, sec + args.delay):
-                    await measure(s)
-                    sleep(1)
-                sec += args.delay
-                delay_end.append(sec)
+                delay_end.append(await measure.wait(sec=args.delay))
 
             t_total, t_user, t_system = measure.times()
 
@@ -183,20 +168,12 @@ async def main():
             clean_end = None
             if "clean" in TARGET[args.target]:
                 process = ssh.background(TARGET[args.target]["clean"])
-                for s in range(sec, sec + args.delay):
-                    await measure(s)
-                    sleep(1)
-                assert process.poll() is not None
-                sec += args.delay
-                clean_end = sec
+                clean_end = await measure.wait(sec=args.delay)
+                assert process.poll() is not None, "Clean has not terminated"
 
             # drop page cache
             ssh.run(f"echo 1 | sudo tee /proc/sys/vm/drop_caches")
-            for s in range(sec, sec + args.delay):
-                await measure(s)
-                sleep(1)
-            sec += args.delay
-            drop_end = sec
+            drop_end = await measure.wait(sec=args.delay)
 
             (root / f"times_{i}.json").write_text(json.dumps({
                 "build": build_end, "delay": delay_end,
@@ -231,69 +208,75 @@ async def main():
     sleep(3)
 
 
-class QMPWrap:
-    def __init__(self, qmp: QMPClient, max: int, min: int) -> None:
-        self.qmp = qmp
-        self.min = round(min)
-        self.max = round(max)
-        self.size = min
-
-    async def set_target_size(self, target_size: int):
-        if target_size >= self.max and self.size == self.max: return
-        if target_size <= self.min and self.size == self.min: return
-
-        self.size = max(self.min, min(self.max, round(target_size)))
-        print("resize", self.size)
-        await self.qmp.execute("qom-set", {
-            "path": "vm0",
-            "property": "requested-size",
-            "value" : (((self.size - self.min) + 2**21 - 1) // 2**21) * 2**21
-        })
-
-
 class Messure:
-    def __init__(self, i: int, ssh: SSHExec, qmp: QMPWrap, ps_proc: Process,
+    def __init__(self, i: int, ssh: SSHExec, vm_resize: VMResize, ps_proc: Process,
                     root: Path, mem_usage: IO[str], args: Namespace) -> None:
         self.i = i
         self.ssh = ssh
-        self.qmp = qmp
+        self.vm_resize = vm_resize
         self.ps_proc = ps_proc
         self.root = root
         self.mem_usage = mem_usage
         self.args = args
 
-    async def __call__(self, sec: int, process: Popen[str] | None = None):
-        if sec == 0:
-            times = self.ps_proc.cpu_times()
-            self._times_user = times.user
-            self._times_system = times.system
-            self._time = time()
+        # A bit of memory is reserved for kernel stuff
+        zoneinfo = self.ssh.output("cat /proc/zoneinfo")
+        self._reserved_mem = (parse_zoneinfo(zoneinfo, "present ") - parse_zoneinfo(zoneinfo, "managed ")) * 2**12
+        self.mem_usage.write("time,rss,small,huge,cached,total\n")
 
-        small, huge = free_pages(self.ssh.output("cat /proc/buddyinfo"))
-        meminfo = parse_meminfo(self.ssh.output("cat /proc/meminfo"))
+        times = self.ps_proc.cpu_times()
+        self._times_user = times.user
+        self._times_system = times.system
+        self._time = time()
+        self._next_resize = 0.0
+
+    async def __call__(self, process: Popen[str] | None = None):
+        sec = self.sec()
+
+        small, huge = free_pages(self.ssh.output("cat /proc/buddyinfo", timeout=1))
+        meminfo = parse_meminfo(self.ssh.output("cat /proc/meminfo", timeout=1))
+        total = meminfo["MemTotal"] + self._reserved_mem
         rss = self.ps_proc.memory_info().rss
-        self.mem_usage.write(f"{rss},{small},{huge},{meminfo['Cached']},{meminfo['MemTotal']}\n")
+        self.mem_usage.write(f"{sec:.2f},{rss},{small},{huge},{meminfo['Cached']},{total}\n")
 
         if self.args.frag:
             output = self.ssh.output("cat /proc/llfree_frag")
-            (self.root / f"frag_{self.i}_{sec}.txt").write_text(output)
+            (self.root / f"frag_{self.i}_{sec:.2f}.txt").write_text(output)
 
         if process is not None:
             with (self.root / f"out_{self.i}.txt").open("a+") as f:
                 f.write(rm_ansi_escape(non_block_read(process.stdout)))
 
         # resize vm
-        if self.args.mode.startswith("virtio-mem-") and sec % PLUGGING_FREQ == 0:
+        if self.args.mode.startswith("virtio-mem-") and sec >= self._next_resize:
+            self._next_resize += PLUGGING_FREQ
             # Follow free huge pages
             free = huge * 2**(12+9)
             # Step size, amount of mem that is plugged/unplugged
-            step = round(self.qmp.max * PLUGGING_FRACTION)
+            step = round(self.vm_resize.max * PLUGGING_FRACTION)
             if free < step/2: # grow faster
-                await self.qmp.set_target_size(self.qmp.size + 2*step)
+                await self.vm_resize.set(self.vm_resize.size + 2*step)
             elif free < step:
-                await self.qmp.set_target_size(self.qmp.size + step)
+                await self.vm_resize.set(self.vm_resize.size + step)
             elif free > 2*step:
-                await self.qmp.set_target_size(self.qmp.size - step)
+                await self.vm_resize.set(self.vm_resize.size - step)
+
+    def sec(self) -> float:
+        return time() - self._time
+
+    async def wait(self, sec: float | None = None,
+             condition: Callable[[], bool] | None = None,
+             process: Popen[str] | None = None) -> float:
+        if sec is not None:
+            wait_end = self.sec() + sec
+            while self.sec() < wait_end:
+                await self(process)
+                sleep(1)
+        elif condition is not None:
+            while condition():
+                await self(process)
+                sleep(1)
+        return self.sec()
 
     def times(self) -> Tuple[float, float, float]:
         """Returns (total, user, system) times in s"""

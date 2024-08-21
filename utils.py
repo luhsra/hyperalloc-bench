@@ -85,7 +85,7 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     device = {
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
-        "ioctl": True,
+        "ioctl": False,
         "auto-mode-iothread": auto_mode_iothread,
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
     }
@@ -264,6 +264,14 @@ def parse_meminfo(meminfo: str) -> Dict[str, int]:
         return k, v
 
     return dict(map(parse_line, meminfo.strip().splitlines()))
+
+
+def parse_zoneinfo(zoneinfo: str, key: str) -> int:
+    res = 0
+    for line in zoneinfo.splitlines():
+        if (i := line.find(key)) >= 0:
+            res += int(line[i + len(key) + 1:].strip())
+    return res
 
 
 def sys_info() -> dict:

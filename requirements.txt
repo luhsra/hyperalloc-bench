@@ -3,3 +3,4 @@ pandas==1.5.3
 psutil==5.9.4
 qemu.qmp==0.0.3
 ipykernel==6.29.3
+scipy==1.14.1
