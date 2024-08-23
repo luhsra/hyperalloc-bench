@@ -1,4 +1,4 @@
-from qemu.qmp import QMPClient
+from qemu.qmp import QMPClient, ExecInterruptedError
 
 
 HUGEPAGE_SIZE = 2**21
@@ -15,15 +15,13 @@ class VMResize:
 
     async def set(self, target_size: int | float):
         """Resize the VM to the target_size (bytes)"""
-        if target_size >= self.max and self.size == self.max: return
-        if target_size <= self.min and self.size == self.min: return
-
         new_size = round(target_size)
-        # align up to hugepage size
-        new_size = (((new_size - self.min) + HUGEPAGE_SIZE - 1) // HUGEPAGE_SIZE) * HUGEPAGE_SIZE
-        new_size = max(self.min, min(self.max, round(new_size)))
 
-        if new_size != self.size: return
+        # align up to hugepage size
+        new_size = ((new_size + HUGEPAGE_SIZE - 1) // HUGEPAGE_SIZE) * HUGEPAGE_SIZE
+        new_size = max(self.min, min(self.max, new_size))
+
+        if new_size == self.size: return
 
         self.size = new_size
         print("resize", self.size)
@@ -37,7 +35,7 @@ class VMResize:
                 await self.qmp.execute("qom-set", {
                     "path": "vm0",
                     "property": "requested-size",
-                    "value" : self.size
+                    "value" : self.size - self.min
                 })
             case _: assert False, "Invalid Mode"
 

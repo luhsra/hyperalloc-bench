@@ -11,11 +11,6 @@ import signal
 from qemu.qmp import QMPClient
 from vm_resize import VMResize
 
-# virtio-mem: Time between plug/unplug requests
-PLUGGING_FREQ = 5
-# virtio-mem: Amount of memory that is plugged/unplugged in one step
-PLUGGING_FRACTION = 1/32
-
 
 DEFAULTS = {
     "base": {
@@ -95,6 +90,9 @@ async def main():
     parser.add_argument("--target", choices=list(TARGET.keys()), required=True)
     parser.add_argument("--vfio", type=int,
                         help="IOMMU that shoud be passed into VM. This has to be bound to VFIO first!")
+    parser.add_argument("--vmem-fraction", type=float, default=1/32)
+    parser.add_argument("--vmem-delay", type=float, default=2000, help="In ms")
+    parser.add_argument("--vmem-capacity", type=float, default=32)
     args, root = setup("compiling", parser, custom="vm")
 
     ssh = SSHExec(args.user, port=args.port)
@@ -228,13 +226,12 @@ class Messure:
         self._times_user = times.user
         self._times_system = times.system
         self._time = time()
-        self._next_resize = 0.0
 
     async def __call__(self, process: Popen[str] | None = None):
         sec = self.sec()
 
-        small, huge = free_pages(self.ssh.output("cat /proc/buddyinfo", timeout=1))
-        meminfo = parse_meminfo(self.ssh.output("cat /proc/meminfo", timeout=1))
+        small, huge = free_pages(self.ssh.output("cat /proc/buddyinfo", timeout=10))
+        meminfo = parse_meminfo(self.ssh.output("cat /proc/meminfo", timeout=10))
         total = meminfo["MemTotal"] + self._reserved_mem
         rss = self.ps_proc.memory_info().rss
         self.mem_usage.write(f"{sec:.2f},{rss},{small},{huge},{meminfo['Cached']},{total}\n")
@@ -248,12 +245,11 @@ class Messure:
                 f.write(rm_ansi_escape(non_block_read(process.stdout)))
 
         # resize vm
-        if self.args.mode.startswith("virtio-mem-") and sec >= self._next_resize:
-            self._next_resize += PLUGGING_FREQ
+        if self.args.mode.startswith("virtio-mem-"):
             # Follow free huge pages
-            free = huge * 2**(12+9)
+            free = int(huge * 2**(12+9) * 0.9) # 10% above allocated pages
             # Step size, amount of mem that is plugged/unplugged
-            step = round(self.vm_resize.max * PLUGGING_FRACTION)
+            step = round(self.vm_resize.max * self.args.vmem_fraction)
             if free < step/2: # grow faster
                 await self.vm_resize.set(self.vm_resize.size + 2*step)
             elif free < step:
