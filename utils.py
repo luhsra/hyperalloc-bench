@@ -9,7 +9,7 @@ from itertools import chain
 from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT, check_call, check_output
 from time import sleep
-from typing import IO, Any, Dict, List, Optional, Tuple
+from typing import IO, Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -67,7 +67,7 @@ def non_block_read(output: IO[str]) -> str:
     return out
 
 
-BALLOON_CFG = {
+BALLOON_CFG: Dict[str, Callable[[int, int, int, int], List[str]]] = {
     "base-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
     "base-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, True),
     "huge-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
@@ -78,7 +78,6 @@ BALLOON_CFG = {
     "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(mem, min_mem, init_mem, False),
 }
 
-DEFAULT_KERNEL_CMD = "root=/dev/sda3 console=ttyS0 nokaslr"
 def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
@@ -91,7 +90,6 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
     }
     return [
         "-m", f"{mem}G",
-        "-append", DEFAULT_KERNEL_CMD,
         "-object", f"iothread,id={auto_mode_iothread}",
         *chain(*[["-object", f"iothread,id={t}"] for t in per_core_iothreads]),
         "-device", json.dumps(device),
@@ -109,7 +107,7 @@ def vfio_args(iommu_group: int | None) -> List[str]:
     ]))
 
 def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
-    return ["-m", f"{mem}G","-append", DEFAULT_KERNEL_CMD,"-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
+    return ["-m", f"{mem}G","-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
 
 def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int, kernel: bool) -> List[str]:
     default_state = "online_kernel" if kernel else "online_movable"
@@ -117,7 +115,7 @@ def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int, kernel: bool) ->
     req_size = round(init_mem - min_mem)
     return [
         "-m", f"{min_mem}G,maxmem={mem}G",
-        "-append", f"{DEFAULT_KERNEL_CMD} memhp_default_state={default_state}",
+        "-append", f"memhp_default_state={default_state}",
         "-machine", "pc",
         "-object", f"memory-backend-ram,id=vmem0,size={vmem_size}G,prealloc=off,reserve=off",
         "-device", f"virtio-mem-pci,id=vm0,memdev=vmem0,node=0,requested-size={req_size}G,prealloc=off"
@@ -147,7 +145,7 @@ def qemu_vm(
     if not extra_args:
         extra_args = []
 
-    args = [
+    base_args = [
         qemu,
         #"-m", f"{mem}G",
         "-smp", f"{cores}",
@@ -155,6 +153,7 @@ def qemu_vm(
         "-serial", "mon:stdio",
         "-nographic",
         "-kernel", kernel,
+        "-append", "root=/dev/sda3 console=ttyS0 nokaslr",
         "-qmp", f"tcp:localhost:{qmp_port},server=on,wait=off",
         "-nic", f"user,hostfwd=tcp:127.0.0.1:{port}-:22",
         "-no-reboot",
@@ -163,16 +162,31 @@ def qemu_vm(
         *vfio_args(vfio_group)
     ]
 
+    # Combine `-append`
+    args = []
+    cmdline = []
+    is_append = False
+    for arg in base_args:
+        if is_append: cmdline.append(arg)
+        elif arg != "-append": args.append(arg)
+        is_append = arg == "-append"
+    args += ["-append", " ".join(cmdline)]
+
     if kvm:
         args.append("-enable-kvm")
 
     process = Popen(args, stdout=PIPE, stderr=STDOUT, text=True, env=env)
 
     # Pin qemu to a cpuset on one numa node with one core per vcpu
-    CORES_NODE = psutil.cpu_count(logical=False) // 2
-    cpu_set = list(map(lambda x: x * 2, range(0, min(cores, CORES_NODE))))
-    if cores > CORES_NODE:
-        cpu_set += list(map(lambda x: x * 2 + 1, list(range(0, cores - CORES_NODE))))
+    logical = psutil.cpu_count(logical=True)
+    physical = psutil.cpu_count(logical=False)
+    step = 1
+    if logical > physical:
+        print("\033[31mWARNING: SMT detected!\033[0m")
+        step = 2
+    assert cores <= physical, "Not enough cores"
+
+    cpu_set = [x * step for x in range(0, cores)]
 
     q = psutil.Process(process.pid)
     q.cpu_affinity(cpu_set)

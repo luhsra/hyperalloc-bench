@@ -91,26 +91,43 @@ async def main():
     parser.add_argument("--vfio", type=int,
                         help="IOMMU that shoud be passed into VM. This has to be bound to VFIO first!")
     parser.add_argument("--vmem-fraction", type=float, default=1/32)
-    parser.add_argument("--vmem-delay", type=float, default=2000, help="In ms")
-    parser.add_argument("--vmem-capacity", type=float, default=32)
+    parser.add_argument("--fpr-delay", type=int, help="Delay between reports in ms")
+    parser.add_argument("--fpr-capacity", type=int, help="Size of the fpr buffer")
+    parser.add_argument("--fpr-order", type=int, help="Report granularity")
     args, root = setup("compiling", parser, custom="vm")
 
     ssh = SSHExec(args.user, port=args.port)
 
     print("Running")
+    i = 0
 
     try:
         print("start qemu...")
         min_mem = round(args.mem / 8)
+        extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem)
+        if (x := args.fpr_delay) is not None:
+            extra_args += ["-append", f"page_reporting.page_reporting_delay={x}"]
+        if (x := args.fpr_capacity) is not None:
+            extra_args += ["-append", f"page_reporting.page_reporting_capacity={x}"]
+        if (x := args.fpr_order) is not None:
+            extra_args += ["-append", f"page_reporting.page_reporting_order={x}"]
+
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
-                       extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem),
-                       vfio_group=args.vfio)
+                       extra_args=extra_args, vfio_group=args.vfio)
         ps_proc = Process(qemu.pid)
 
         print("started")
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
 
         qemu_wait_startup(qemu, root / "boot.txt")
+
+        # Check for the FPR configuration
+        if (x := args.fpr_delay) is not None:
+            assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_delay").strip())
+        if (x := args.fpr_capacity) is not None:
+            assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_capacity").strip())
+        if (x := args.fpr_order) is not None:
+            assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_order").strip())
 
         client = QMPClient("compile vm")
         await client.connect(("127.0.0.1", args.qmp))
@@ -189,7 +206,7 @@ async def main():
 
 
     except Exception as e:
-        print(e)
+        (root / "exception.txt").write_text(str(e))
         if isinstance(e, CalledProcessError):
             with (root / f"error_{i}.txt").open("w+") as f:
                 if e.stdout: f.write(e.stdout)
