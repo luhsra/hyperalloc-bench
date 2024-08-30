@@ -5,13 +5,13 @@ HUGEPAGE_SIZE = 2**21
 """Size of a huge page in bytes"""
 
 class VMResize:
-    def __init__(self, qmp: QMPClient, mode: str, max: int, min: int) -> None:
+    def __init__(self, qmp: QMPClient, mode: str, max: int, min: int, init: int | None = None) -> None:
         """min and max are the VM memory limits in bytes"""
         self.qmp = qmp
         self.mode = mode
         self.min = round(min)
         self.max = round(max)
-        self.size = min
+        self.size = init if init is not None else min
 
     async def set(self, target_size: int | float):
         """Resize the VM to the target_size (bytes)"""

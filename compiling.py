@@ -3,7 +3,7 @@ import asyncio
 import shlex
 from subprocess import CalledProcessError
 from time import sleep, time
-from typing import Any, Callable, Sequence
+from collections.abc import Callable, Sequence
 
 from utils import *
 from psutil import Process
@@ -101,39 +101,42 @@ async def main():
     print("Running")
     i = 0
 
+    qemu = None
+
     try:
-        print("start qemu...")
-        min_mem = round(args.mem / 8)
-        extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem)
-        if (x := args.fpr_delay) is not None:
-            extra_args += ["-append", f"page_reporting.page_reporting_delay={x}"]
-        if (x := args.fpr_capacity) is not None:
-            extra_args += ["-append", f"page_reporting.page_reporting_capacity={x}"]
-        if (x := args.fpr_order) is not None:
-            extra_args += ["-append", f"page_reporting.page_reporting_order={x}"]
-
-        qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
-                       extra_args=extra_args, vfio_group=args.vfio)
-        ps_proc = Process(qemu.pid)
-
-        print("started")
-        (root / "cmd.sh").write_text(shlex.join(qemu.args))
-
-        qemu_wait_startup(qemu, root / "boot.txt")
-
-        # Check for the FPR configuration
-        if (x := args.fpr_delay) is not None:
-            assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_delay").strip())
-        if (x := args.fpr_capacity) is not None:
-            assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_capacity").strip())
-        if (x := args.fpr_order) is not None:
-            assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_order").strip())
-
-        client = QMPClient("compile vm")
-        await client.connect(("127.0.0.1", args.qmp))
-        vm_resize = VMResize(client, "virtio-mem-movable", args.mem * 1024**3, min_mem * 1024**3)
-
         for i in range(args.iter):
+            print("start qemu...")
+            min_mem = round(args.mem / 8)
+            extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem)
+            if (x := args.fpr_delay) is not None:
+                extra_args += ["-append", f"page_reporting.page_reporting_delay={x}"]
+            if (x := args.fpr_capacity) is not None:
+                extra_args += ["-append", f"page_reporting.page_reporting_capacity={x}"]
+            if (x := args.fpr_order) is not None:
+                extra_args += ["-append", f"page_reporting.page_reporting_order={x}"]
+
+            qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
+                        extra_args=extra_args, vfio_group=args.vfio)
+            ps_proc = Process(qemu.pid)
+
+            print("started")
+            if i == 0:
+                (root / "cmd.sh").write_text(shlex.join(qemu.args))
+
+            qemu_wait_startup(qemu, root / f"boot_{i}.txt")
+
+            # Check for the FPR configuration
+            if (x := args.fpr_delay) is not None:
+                assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_delay").strip())
+            if (x := args.fpr_capacity) is not None:
+                assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_capacity").strip())
+            if (x := args.fpr_order) is not None:
+                assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_order").strip())
+
+            client = QMPClient("compile vm")
+            await client.connect(("127.0.0.1", args.qmp))
+            vm_resize = VMResize(client, "virtio-mem-movable", args.mem * 1024**3, min_mem * 1024**3)
+
             if qemu.poll() is not None:
                 raise Exception("Qemu crashed")
 
@@ -204,6 +207,13 @@ async def main():
                 while perf.poll() is None:
                     sleep(1)
 
+            with (root / f"out_{i}.txt").open("a+") as f:
+                f.write(rm_ansi_escape(non_block_read(qemu.stdout)))
+
+            print("terminate...")
+            await client.disconnect()
+            qemu.terminate()
+            sleep(3)
 
     except Exception as e:
         (root / "exception.txt").write_text(str(e))
@@ -211,16 +221,10 @@ async def main():
             with (root / f"error_{i}.txt").open("w+") as f:
                 if e.stdout: f.write(e.stdout)
                 if e.stderr: f.write(e.stderr)
-        try:
+        if qemu:
             (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
             qemu.terminate()
-        except UnboundLocalError: pass
         raise e
-
-    (root / "out.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
-    print("terminate...")
-    qemu.terminate()
-    sleep(3)
 
 
 class Messure:
@@ -291,7 +295,7 @@ class Messure:
                 sleep(1)
         return self.sec()
 
-    def times(self) -> Tuple[float, float, float]:
+    def times(self) -> tuple[float, float, float]:
         """Returns (total, user, system) times in s"""
         times = self.ps_proc.cpu_times()
         return (

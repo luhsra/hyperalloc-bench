@@ -1,3 +1,4 @@
+from collections.abc import Callable
 import fcntl
 import json
 import os
@@ -9,14 +10,14 @@ from itertools import chain
 from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT, check_call, check_output
 from time import sleep
-from typing import IO, Any, Callable, Dict, List, Optional, Tuple
+from typing import IO, Any
 
 import pandas as pd
 
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 
-def setup(name: str, parser: ArgumentParser, custom=None) -> Tuple[Namespace, Path]:
+def setup(name: str, parser: ArgumentParser, custom=None) -> tuple[Namespace, Path]:
     """
     Setup the benchmark directory and save the system config and execution parameters.
 
@@ -53,7 +54,9 @@ def rm_ansi_escape(input: str) -> str:
     return ANSI_ESCAPE.sub("", input)
 
 
-def non_block_read(output: IO[str]) -> str:
+def non_block_read(output: IO[str] | None) -> str:
+    if output is None: return ""
+
     fd = output.fileno()
     fl = fcntl.fcntl(fd, fcntl.F_GETFL)
     fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
@@ -67,7 +70,7 @@ def non_block_read(output: IO[str]) -> str:
     return out
 
 
-BALLOON_CFG: Dict[str, Callable[[int, int, int, int], List[str]]] = {
+BALLOON_CFG: dict[str, Callable[[int, int, int, int], list[str]]] = {
     "base-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
     "base-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, True),
     "huge-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
@@ -78,7 +81,7 @@ BALLOON_CFG: Dict[str, Callable[[int, int, int, int], List[str]]] = {
     "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(mem, min_mem, init_mem, False),
 }
 
-def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
+def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
     auto_mode_iothread = "auto-mode-iothread"
     device = {
@@ -95,7 +98,7 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
         "-device", json.dumps(device),
     ]
 
-def vfio_args(iommu_group: int | None) -> List[str]:
+def vfio_args(iommu_group: int | None) -> list[str]:
     if iommu_group is None:
         return []
     assert (Path("/dev/vfio") / str(iommu_group)).exists(), "IOMMU Group is not bound to VFIO!"
@@ -106,10 +109,10 @@ def vfio_args(iommu_group: int | None) -> List[str]:
         })] for d in path.iterdir()
     ]))
 
-def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> List[str]:
+def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
     return ["-m", f"{mem}G","-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
 
-def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int, kernel: bool) -> List[str]:
+def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int, kernel: bool) -> list[str]:
     default_state = "online_kernel" if kernel else "online_movable"
     vmem_size = round(mem - min_mem)
     req_size = round(init_mem - min_mem)
@@ -131,8 +134,8 @@ def qemu_vm(
     hda: str = "resources/hda.qcow2",
     kvm: bool = True,
     qmp_port: int = 5023,
-    extra_args: List[str] | None = None,
-    env: Dict[str, str] | None = None,
+    extra_args: list[str] | None = None,
+    env: dict[str, str] | None = None,
     vfio_group: int | None = None
 ) -> Popen[str]:
     """Start a vm with the given configuration."""
@@ -199,7 +202,7 @@ def qemu_wait_startup(qemu: Popen[str], logfile: Path):
     while True:
         sleep(3)
         assert qemu.poll() is None
-        text = non_block_read(qemu.stdout)
+        text = non_block_read(s) if (s := qemu.stdout) else ""
         if len(text) == 0:
             # no changes in the past seconds
             # we either finished or paniced
@@ -220,25 +223,25 @@ class SSHExec:
         self.host = host
         self.port = port
 
-    def _ssh(self) -> List[str]:
+    def _ssh(self) -> list[str]:
         return ["ssh", "-o StrictHostKeyChecking=no",
                 f"{self.user}@{self.host}", f"-p {self.port}"]
 
-    def run(self, cmd: str, timeout: Optional[float] = None, args: Optional[List[str]] = None):
+    def run(self, cmd: str, timeout: float | None = None, args: list[str] | None = None):
         """Run cmd and wait for its termination"""
         if not args:
             args = []
         ssh_args = [*self._ssh(), *args, cmd]
         check_call(ssh_args, timeout=timeout)
 
-    def output(self, cmd: str, timeout: Optional[float] = None, args: Optional[List[str]] = None) -> str:
+    def output(self, cmd: str, timeout: float | None = None, args: list[str] | None = None) -> str:
         """Run cmd and capture its output"""
         if not args:
             args = []
         ssh_args = [*self._ssh(), *args, cmd]
         return check_output(ssh_args, text=True, stderr=STDOUT, timeout=timeout)
 
-    def background(self, cmd: str, args: Optional[List[str]] = None) -> Popen[str]:
+    def background(self, cmd: str, args: list[str] | None = None) -> Popen[str]:
         """Run cmd in the background."""
         if not args:
             args = []
@@ -257,7 +260,7 @@ class SSHExec:
             ["scp", "-o StrictHostKeyChecking=no", f"-P{self.port}",
                 f"{self.user}@{self.host}:{source}", dest], timeout=30)
 
-def free_pages(buddyinfo: str) -> Tuple[int, int]:
+def free_pages(buddyinfo: str) -> tuple[int, int]:
     """Calculates the number of free small and huge pages from the buddy allocator state."""
     small = 0
     huge = 0
@@ -270,9 +273,9 @@ def free_pages(buddyinfo: str) -> Tuple[int, int]:
     return small, huge
 
 
-def parse_meminfo(meminfo: str) -> Dict[str, int]:
+def parse_meminfo(meminfo: str) -> dict[str, int]:
     """Parses linux meminfo to a dict"""
-    def parse_line(line: str) -> Tuple[str, int]:
+    def parse_line(line: str) -> tuple[str, int]:
         [k, v] = map(str.strip, line.split(":"))
         v = (int(v[:-3]) * 1024) if v.endswith(" kB") else int(v)
         return k, v
@@ -303,8 +306,8 @@ def mem_info() -> dict:
     return { k: v for k, v in meminfo.items() if k in whitelist }
 
 
-def git_info(args: Dict[str, Any]) -> Dict[str, Any]:
-    def git_hash(path: Path) -> Dict[str, str]:
+def git_info(args: dict[str, object]) -> dict[str, Any]:
+    def git_hash(path: Path) -> dict[str, str]:
         if not path.exists():
             return {}
 
@@ -333,7 +336,7 @@ def git_info(args: Dict[str, Any]) -> Dict[str, Any]:
     return output
 
 
-def dump_dref(file: IO, prefix: str, data: Dict[str | int, Any]):
+def dump_dref(file: IO, prefix: str, data: dict[str | int, Any]):
     for key, value in data.items():
         if isinstance(value, dict):
             dump_dref(file, f"{prefix}/{key}", value)
@@ -343,22 +346,23 @@ def dump_dref(file: IO, prefix: str, data: Dict[str | int, Any]):
             file.write(f"\\drefset{{{prefix}/{key}}}{{{value}}}\n")
 
 
-def dref_dataframe(name: str, dir: Path, groupby: List[str], data: pd.DataFrame):
-    out = {}
+def dref_dataframe(name: str, dir: Path, groupby: list[str], data: pd.DataFrame):
+    out: dict[str | int, Any] = {}
     data = data.dropna(axis=0).groupby(groupby).mean(numeric_only=True)
     for index, row in data.iterrows():
-        out["/".join(map(str, index))] = row.values[0]
+        out[f"/{index}"] = row.values[0]
+
     with (dir / f"{name}.dref").open("w+") as f:
         dump_dref(f, name, out)
 
-def dref_dataframe_multi(name: str, dir: Path, groupby: List[str], vars: List[str], data: pd.DataFrame):
+def dref_dataframe_multi(name: str, dir: Path, groupby: list[str], vars: list[str], data: pd.DataFrame):
     out = {}
     for var in vars:
         ignored_cols = vars.copy()
         ignored_cols.remove(var)
         d = data[data.columns.difference(ignored_cols)].dropna(axis=0).groupby(groupby).mean(numeric_only=True)
         for index, row in d.iterrows():
-            out["/".join(map(str, index)) + f"/{var}"] = row.values[0]
+            out[f"/{index}" + f"/{var}"] = row.values[0]
 
     with (dir / f"{name}.dref").open("w+") as f:
         dump_dref(f, name, out)

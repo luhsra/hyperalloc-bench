@@ -2,10 +2,11 @@ from argparse import ArgumentParser, Action, Namespace
 import asyncio
 import shlex
 from subprocess import CalledProcessError
-from time import sleep, time
+from time import sleep
 from typing import Any, Sequence
 import csv
 
+from vm_resize import VMResize
 from utils import *
 from psutil import Process
 from qemu.qmp import QMPClient
@@ -79,19 +80,11 @@ async def main():
     qemu = None
     try:
         print("start qemu...")
-        env = {
-            **os.environ,
-            "QEMU_VIRTIO_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
-            "QEMU_VIRTIO_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
-            "QEMU_LLFREE_BALLOON_INFLATE_LOG": str(root / "inf_log.txt"),
-            "QEMU_LLFREE_BALLOON_DEFLATE_LOG": str(root / "def_log.txt"),
-        }
         # make it a little smaller to have some headroom
         min_mem = args.shrink_target
+        extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, args.mem)
         qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
-                       qmp_port=args.qmp,
-                       extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, args.mem),
-                       env=env, vfio_group=args.vfio)
+                       qmp_port=args.qmp, extra_args=extra_args, vfio_group=args.vfio)
         ps_proc = Process(qemu.pid)
 
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
@@ -104,6 +97,10 @@ async def main():
 
         qmp = QMPClient("STREAM machine")
         await qmp.connect(("127.0.0.1", args.qmp))
+
+        max_bytes = args.mem * 1024**3
+        min_bytes = min_mem * 1024**3
+        resize = VMResize(qmp, args.mode, max_bytes, min_bytes, max_bytes)
 
         logfile = (root / "out.txt").open("w+")
 
@@ -122,24 +119,20 @@ async def main():
 
             sleep(args.delay)
 
-            mem = args.mem * 1024**3
-            target = args.shrink_target * 1024**3
-            min_bytes = min_mem * 1024**3
+            target_bytes = args.shrink_target * 1024**3
 
             # Shrink / Inflate
-            await set_balloon(qmp, args.mode, min_bytes, target)
-
-            # Wait until VM is smaller
-            while (size := await query_balloon(qmp, args.mode, min_bytes)) > 1.01 * (target):
+            await resize.set(target_bytes)
+            while (size := resize.query()) > 1.01 * target_bytes:
                 print("inflating", size)
                 sleep(1)
             sleep(args.delay)
 
-            print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target // 1024**2)
+            print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target_bytes // 1024**2)
 
             # Grow / Deflate
-            await set_balloon(qmp, args.mode, min_bytes, mem)
-            while (size := await query_balloon(qmp, args.mode, min_bytes)) < 0.99 * mem:
+            await resize.set(max_bytes)
+            while (size := resize.query()) < 0.99 * max_bytes:
                 print("deflating", size)
                 sleep(1)
             sleep(args.delay)
@@ -165,7 +158,8 @@ async def main():
     except Exception as e:
         print(e)
         errfile = (root / "error.txt").open("w+")
-        errfile.write(rm_ansi_escape(non_block_read(qemu.stdout)))
+        if qemu:
+            errfile.write(rm_ansi_escape(non_block_read(qemu.stdout)))
         if isinstance(e, CalledProcessError):
             if e.stdout: errfile.write(e.stdout)
             if e.stderr: errfile.write(e.stderr)
@@ -173,32 +167,6 @@ async def main():
     print("terminate...")
     if qemu: qemu.terminate()
     sleep(3)
-
-
-async def set_balloon(qmp: QMPClient, mode: str, min_bytes: int, target_bytes: int) -> any:
-    assert target_bytes >= min_bytes
-    match mode:
-        case "base-manual" | "huge-manual":
-            await qmp.execute("balloon", {"value" : target_bytes})
-        case "llfree-manual" | "llfree-manual-map":
-            await qmp.execute("llfree-balloon", {"value" : target_bytes})
-        case "virtio-mem-kernel" | "virtio-mem-movable":
-            await qmp.execute("qom-set", {"path": "vm0",
-                                    "property": "requested-size",
-                                    "value" : target_bytes - min_bytes})
-        case _: assert False, "Invalid Mode"
-
-
-async def query_balloon(qmp: QMPClient, mode: str, min_bytes: int) -> int:
-    match mode:
-        case "base-manual" | "huge-manual":
-            return (await qmp.execute("query-balloon"))["actual"]
-        case "llfree-manual" | "llfree-manual-map":
-            return (await qmp.execute("query-llfree-balloon"))["actual"]
-        case "virtio-mem-kernel" | "virtio-mem-movable":
-            return min_bytes + (await qmp.execute("qom-get", {"path": "vm0",
-                                    "property": "size"}))
-        case _: assert False, "Invalid Mode"
 
 
 def parse_module_output(output: str) -> int:
@@ -212,7 +180,7 @@ def parse_write_output(output: str) -> int:
     return int(next(reader)["aavg"])
 
 
-def parse_output(output: str, mode: str) -> Tuple[int,int]:
+def parse_output(output: str, mode: str) -> tuple[int,int]:
     match mode:
         case "base-manual" | "huge-manual":
             return parse_output_with(output, " virtio_balloon_start ", " virtio_balloon_end ")
@@ -223,7 +191,7 @@ def parse_output(output: str, mode: str) -> Tuple[int,int]:
         case _: assert False, "Invalid Mode"
 
 
-def parse_output_with(output: str, start_marker: str, end_marker: str) -> Tuple[int,int]:
+def parse_output_with(output: str, start_marker: str, end_marker: str) -> tuple[int,int]:
     start = []
     end = []
     for line in output.splitlines():
