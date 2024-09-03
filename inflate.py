@@ -3,7 +3,8 @@ import asyncio
 import shlex
 from subprocess import CalledProcessError
 from time import sleep
-from typing import Any, Sequence
+from typing import Any
+from collections.abc import Sequence
 import csv
 
 from vm_resize import VMResize
@@ -123,7 +124,7 @@ async def main():
 
             # Shrink / Inflate
             await resize.set(target_bytes)
-            while (size := resize.query()) > 1.01 * target_bytes:
+            while (size := await resize.query()) > 1.01 * target_bytes:
                 print("inflating", size)
                 sleep(1)
             sleep(args.delay)
@@ -132,7 +133,7 @@ async def main():
 
             # Grow / Deflate
             await resize.set(max_bytes)
-            while (size := resize.query()) < 0.99 * max_bytes:
+            while (size := await resize.query()) < 0.99 * max_bytes:
                 print("deflating", size)
                 sleep(1)
             sleep(args.delay)
