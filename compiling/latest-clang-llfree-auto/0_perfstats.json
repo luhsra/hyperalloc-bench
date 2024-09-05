@@ -1,5 +1,0 @@
-{"counter-value" : "16246742.000000", "unit" : "", "event" : "kvm:kvm_exit", "event-runtime" : 25857618709365, "pcnt-running" : 100.00, "metric-value" : 0.000000, "metric-unit" : "(null)"}
-{"counter-value" : "17753308713580.000000", "unit" : "", "event" : "dTLB-loads", "event-runtime" : 25861480976279, "pcnt-running" : 100.00, "metric-value" : 0.000000, "metric-unit" : "(null)"}
-{"counter-value" : "33794238344.000000", "unit" : "", "event" : "dTLB-load-misses", "event-runtime" : 25861480870521, "pcnt-running" : 100.00, "metric-value" : 0.190355, "metric-unit" : "of all dTLB cache accesses"}
-{"counter-value" : "8525151550334.000000", "unit" : "", "event" : "dTLB-stores", "event-runtime" : 25861480775493, "pcnt-running" : 100.00, "metric-value" : 0.000000, "metric-unit" : "(null)"}
-{"counter-value" : "3718367976.000000", "unit" : "", "event" : "dTLB-store-misses", "event-runtime" : 25861480678710, "pcnt-running" : 100.00, "metric-value" : 0.000000, "metric-unit" : "(null)"}

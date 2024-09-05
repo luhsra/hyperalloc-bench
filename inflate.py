@@ -125,16 +125,16 @@ async def main():
             # Shrink / Inflate
             await resize.set(target_bytes)
             while (size := await resize.query()) > 1.01 * target_bytes:
-                print("inflating", size)
+                print("inflating", fmt_bytes(size))
                 sleep(1)
             sleep(args.delay)
 
-            print("RSS:", ps_proc.memory_info().rss // 1024**2, "target:", target_bytes // 1024**2)
+            print("RSS:", fmt_bytes(ps_proc.memory_info().rss), "target:", fmt_bytes(target_bytes))
 
             # Grow / Deflate
             await resize.set(max_bytes)
             while (size := await resize.query()) < 0.99 * max_bytes:
-                print("deflating", size)
+                print("deflating", fmt_bytes(size))
                 sleep(1)
             sleep(args.delay)
 

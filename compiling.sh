@@ -6,7 +6,6 @@ source ../venv/bin/activate
 
 ORDERS="0 9"
 CAPACITIES="32 512"
-# CAPACITIES="32 512"
 DELAYS="2000 100"
 
 # for O in $ORDERS; do
@@ -18,9 +17,11 @@ DELAYS="2000 100"
 # done
 
 # python3 compiling.py --mode base-auto --target write -m12 -c12 --delay 10
+# python3 compiling.py --mode base-auto --target write -m12 -c12 --delay 10
 # python3 compiling.py --mode huge-auto --target write -m12 -c12 --delay 10
 # python3 compiling.py --mode llfree-auto --target write -m12 -c12 --delay 10
-# python3 compiling.py --mode llfree-auto --target write -m12 -c12 --suffix write-llfree-auto --delay 10 --perf
+# python3 compiling.py --mode llfree-auto --target write -m12 -c12 --delay 10 --perf
+# python3 compiling.py --mode llfree-auto --target write -m12 -c12 --suffix llfree-auto-vfio --delay 10 --vfio 4
 
 # Linux
 ARGS="--target linux -m8 -c12 --delay 30"
@@ -39,24 +40,24 @@ ARGS="--target linux -m8 -c12 --delay 30"
 
 # Clang
 ARGS="--target clang -m16 -c12 --delay 200"
-# python3 compiling.py --mode base-manual --suffix clang-base-manual $ARGS
-# python3 compiling.py --mode base-auto --suffix clang-base-auto $ARGS
-# python3 compiling.py --mode huge-auto --suffix clang-huge-auto $ARGS
-# python3 compiling.py --mode llfree-manual --suffix clang-llfree-manual $ARGS
-python3 compiling.py --mode llfree-auto --suffix clang-llfree-auto $ARGS
-# python3 compiling.py --mode llfree-auto --suffix clang-llfree-auto-vfio --vfio 4 $ARGS
-# python3 compiling.py --mode virtio-mem-movable --suffix clang-virtio-mem-vfio --vfio 4 $ARGS
+# python3 compiling.py --mode base-manual --suffix clang-base-manual $ARGS --iter 3
+python3 compiling.py --mode base-auto --suffix clang-base-auto $ARGS --iter 3
+# python3 compiling.py --mode huge-auto --suffix clang-huge-auto $ARGS --iter 3
+# python3 compiling.py --mode llfree-manual --suffix clang-llfree-manual $ARGS --iter 3
+# python3 compiling.py --mode llfree-auto --suffix clang-llfree-auto $ARGS --iter 3
+# python3 compiling.py --mode llfree-auto --suffix clang-llfree-auto-vfio --vfio 4 $ARGS --iter 3
+# python3 compiling.py --mode virtio-mem-movable --suffix clang-virtio-mem-vfio --vfio 4 $ARGS --iter 3
 
 
 # python3 compiling.py --mode base-manual --kernel /srv/scratch/wrenger/llfree-linux/build-llfree-vm/arch/x86/boot/bzImage --qemu qemu-system-x86_64 --suffix clang-llfree-test $ARGS --frag
 
-for O in $ORDERS; do
-    for D in $DELAYS; do
-        for C in $CAPACITIES; do
-            python3 compiling.py --mode base-auto $ARGS --fpr-order $O --fpr-delay $D --fpr-capacity $C --suffix "clang-base-auto-o$O-d$D-c$C" --iter 3
-        done
-    done
-done
+# for O in $ORDERS; do
+#     for D in $DELAYS; do
+#         for C in $CAPACITIES; do
+#             python3 compiling.py --mode base-auto $ARGS --fpr-order $O --fpr-delay $D --fpr-capacity $C --suffix "clang-base-auto-o$O-d$D-c$C" --iter 3
+#         done
+#     done
+# done
 
 # Blender
 ARGS="--target blender -m16 -c12 --delay 240"

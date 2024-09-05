@@ -130,8 +130,10 @@ async def main():
                 assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_delay").strip())
             if (x := args.fpr_capacity) is not None:
                 assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_capacity").strip())
-            if (x := args.fpr_order) is not None:
-                assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_order").strip())
+            if args.mode == "base-auto":
+                order = x if (x := args.fpr_order) is not None else 9
+                assert order == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_order").strip
+                ())
 
             client = QMPClient("compile vm")
             await client.connect(("127.0.0.1", args.qmp))

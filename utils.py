@@ -70,6 +70,14 @@ def non_block_read(output: IO[str] | None) -> str:
     return out
 
 
+def fmt_bytes(bytes: int) -> str:
+    suffix = ["GiB", "MiB", "KiB"]
+    for i, s in enumerate(suffix):
+        fac = 1024 ** (len(suffix) - i)
+        if bytes >= fac: return f"{bytes / fac:.2f} {s}"
+    return f"{bytes} B"
+
+
 BALLOON_CFG: dict[str, Callable[[int, int, int, int], list[str]]] = {
     "base-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
     "base-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, True),
