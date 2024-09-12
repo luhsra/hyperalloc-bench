@@ -1,6 +1,6 @@
-seaborn==0.12.0
-pandas==1.5.3
-psutil==5.9.4
+seaborn==0.13.2
+pandas==2.2.2
+psutil==6.0.0
 qemu.qmp==0.0.3
 ipykernel==6.29.3
 scipy==1.14.1
