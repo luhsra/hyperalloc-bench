@@ -310,7 +310,7 @@ def sys_info() -> dict:
 
 def mem_info() -> dict:
     meminfo = parse_meminfo(Path("/proc/meminfo").read_text())
-    whitelist = {"MemTotal", "MemFree", "MemAvailable"}
+    whitelist = {"MemTotal", "MemFree", "MemAvailable", "Cached"}
     return { k: v for k, v in meminfo.items() if k in whitelist }
 
 

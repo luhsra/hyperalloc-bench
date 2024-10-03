@@ -89,7 +89,7 @@ async def main():
                         required=True, action=ModeAction)
     parser.add_argument("--target", choices=list(TARGET.keys()), required=True)
     parser.add_argument("--vfio", type=int,
-                        help="IOMMU that shoud be passed into VM. This has to be bound to VFIO first!")
+                        help="IOMMU that should be passed into VM. This has to be bound to VFIO first!")
     parser.add_argument("--vmem-fraction", type=float, default=1/32)
     parser.add_argument("--fpr-delay", type=int, help="Delay between reports in ms")
     parser.add_argument("--fpr-capacity", type=int, help="Size of the fpr buffer")
