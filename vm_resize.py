@@ -1,4 +1,5 @@
 from qemu.qmp import QMPClient, ExecInterruptedError
+from utils import fmt_bytes
 
 
 HUGEPAGE_SIZE = 2**21
@@ -24,7 +25,7 @@ class VMResize:
         if new_size == self.size: return
 
         self.size = new_size
-        print("resize", self.size)
+        print("resize", fmt_bytes(self.size))
 
         match self.mode:
             case "base-manual" | "huge-manual":

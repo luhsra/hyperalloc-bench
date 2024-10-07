@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 import fcntl
 import json
 import os
@@ -344,21 +344,23 @@ def git_info(args: dict[str, object]) -> dict[str, Any]:
     return output
 
 
-def dump_dref(file: IO, prefix: str, data: dict[str | int, Any]):
+def dump_dref(file: IO, prefix: str, data: dict[str | int | float, Any]):
     for key, value in data.items():
         if isinstance(value, dict):
             dump_dref(file, f"{prefix}/{key}", value)
-        elif isinstance(value, list):
+        elif isinstance(value, list) or isinstance(value, tuple):
             dump_dref(file, f"{prefix}/{key}", dict(enumerate(data)))
         else:
             file.write(f"\\drefset{{{prefix}/{key}}}{{{value}}}\n")
 
 
 def dref_dataframe(name: str, dir: Path, groupby: list[str], data: pd.DataFrame):
-    out: dict[str | int, Any] = {}
+    out = {}
     data = data.dropna(axis=0).groupby(groupby).mean(numeric_only=True)
     for index, row in data.iterrows():
-        out[f"/{index}"] = row.values[0]
+        if isinstance(index, Iterable):
+            index = "/".join(map(str, index))
+        out[f"{index}"] = row.values[0]
 
     with (dir / f"{name}.dref").open("w+") as f:
         dump_dref(f, name, out)
@@ -370,7 +372,9 @@ def dref_dataframe_multi(name: str, dir: Path, groupby: list[str], vars: list[st
         ignored_cols.remove(var)
         d = data[data.columns.difference(ignored_cols)].dropna(axis=0).groupby(groupby).mean(numeric_only=True)
         for index, row in d.iterrows():
-            out[f"/{index}" + f"/{var}"] = row.values[0]
+            if isinstance(index, Iterable):
+                index = "/".join(map(str, index))
+            out[f"{index}" + f"/{var}"] = row.values[0]
 
     with (dir / f"{name}.dref").open("w+") as f:
         dump_dref(f, name, out)
