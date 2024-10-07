@@ -1,28 +1,28 @@
-\drefset{clang/all/Buddy/gib_m}{481.73135876825125}
+\drefset{clang/all/Buddy/gib_m}{660.5653333333333}
 \drefset{clang/all/Buddy/time}{41.30393359396192}
 \drefset{clang/all/HyperAlloc/gib_m}{358.0552143646876}
 \drefset{clang/all/HyperAlloc/time}{40.78577717542648}
 \drefset{clang/all/HyperAlloc+VFIO/gib_m}{359.43944616275365}
 \drefset{clang/all/HyperAlloc+VFIO/time}{40.8213159693612}
-\drefset{clang/all/LLFree/gib_m}{500.3895244196786}
+\drefset{clang/all/LLFree/gib_m}{649.5688888888889}
 \drefset{clang/all/LLFree/time}{40.598102209303114}
 \drefset{clang/all/virtio-balloon/gib_m}{434.02871950795924}
 \drefset{clang/all/virtio-balloon/time}{41.19176960918639}
 \drefset{clang/all/virtio-mem+VFIO/gib_m}{507.59337033494313}
 \drefset{clang/all/virtio-mem+VFIO/time}{41.15067586104075}
-\drefset{clang/fpr/o0-d100-c32/gib_m}{446.9051428599887}
-\drefset{clang/fpr/o0-d100-c32/time}{61.16023981703652}
-\drefset{clang/fpr/o0-d100-c512/gib_m}{450.469674451722}
-\drefset{clang/fpr/o0-d100-c512/time}{61.67623890240987}
-\drefset{clang/fpr/o0-d2000-c32/gib_m}{384.4976037010617}
-\drefset{clang/fpr/o0-d2000-c32/time}{48.39448964728249}
-\drefset{clang/fpr/o0-d2000-c512/gib_m}{377.48839540184866}
-\drefset{clang/fpr/o0-d2000-c512/time}{48.39666695594787}
-\drefset{clang/fpr/o9-d100-c32/gib_m}{437.2097461940977}
-\drefset{clang/fpr/o9-d100-c32/time}{41.19448616637124}
-\drefset{clang/fpr/o9-d100-c512/gib_m}{434.4858773531384}
-\drefset{clang/fpr/o9-d100-c512/time}{41.22623717387517}
-\drefset{clang/fpr/o9-d2000-c32/gib_m}{435.13998856841187}
-\drefset{clang/fpr/o9-d2000-c32/time}{41.27612724569109}
-\drefset{clang/fpr/o9-d2000-c512/gib_m}{430.8328684382968}
-\drefset{clang/fpr/o9-d2000-c512/time}{41.203649040063226}
+\drefset{clang/fpr/o=0 d=100 c=32/gib_m}{446.9051428599887}
+\drefset{clang/fpr/o=0 d=100 c=32/time}{61.16023981703652}
+\drefset{clang/fpr/o=0 d=100 c=512/gib_m}{450.469674451722}
+\drefset{clang/fpr/o=0 d=100 c=512/time}{61.67623890240987}
+\drefset{clang/fpr/o=0 d=2000 c=32/gib_m}{384.4976037010617}
+\drefset{clang/fpr/o=0 d=2000 c=32/time}{48.39448964728249}
+\drefset{clang/fpr/o=0 d=2000 c=512/gib_m}{377.48839540184866}
+\drefset{clang/fpr/o=0 d=2000 c=512/time}{48.39666695594787}
+\drefset{clang/fpr/o=9 d=100 c=32/gib_m}{437.2097461940977}
+\drefset{clang/fpr/o=9 d=100 c=32/time}{41.19448616637124}
+\drefset{clang/fpr/o=9 d=100 c=512/gib_m}{434.4858773531384}
+\drefset{clang/fpr/o=9 d=100 c=512/time}{41.22623717387517}
+\drefset{clang/fpr/o=9 d=2000 c=32/gib_m}{435.13998856841187}
+\drefset{clang/fpr/o=9 d=2000 c=32/time}{41.27612724569109}
+\drefset{clang/fpr/o=9 d=2000 c=512/gib_m}{430.8328684382968}
+\drefset{clang/fpr/o=9 d=2000 c=512/time}{41.203649040063226}
