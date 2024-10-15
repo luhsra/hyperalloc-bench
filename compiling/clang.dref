@@ -10,10 +10,10 @@
 \drefset{clang//virtio-mem+VFIO/time}{41.15067586104075}
 \drefset{clang//virtio-mem+VFIO/time_system}{6.067}
 \drefset{clang//virtio-mem+VFIO/time_user}{484.52477777777773}
-\drefset{clang/baseline/Buddy/gib_m}{660.5653333333333}
-\drefset{clang/baseline/Buddy/time}{41.30393359396192}
-\drefset{clang/baseline/Buddy/time_system}{6.872944444444445}
-\drefset{clang/baseline/Buddy/time_user}{485.61211111111106}
+\drefset{clang/baseline/Buddy/gib_m}{658.9946666666666}
+\drefset{clang/baseline/Buddy/time}{41.196514607800374}
+\drefset{clang/baseline/Buddy/time_system}{6.2284444444444444}
+\drefset{clang/baseline/Buddy/time_user}{484.6968888888889}
 \drefset{clang/baseline/LLFree/gib_m}{649.5688888888889}
 \drefset{clang/baseline/LLFree/time}{40.598102209303114}
 \drefset{clang/baseline/LLFree/time_system}{2.6275}
