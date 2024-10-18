@@ -6,6 +6,10 @@
 \drefset{clang//HyperAlloc+VFIO/time}{40.8213159693612}
 \drefset{clang//HyperAlloc+VFIO/time_system}{3.3288888888888892}
 \drefset{clang//HyperAlloc+VFIO/time_user}{483.3968888888889}
+\drefset{clang//virtio-mem/gib_m}{479.4017641303804}
+\drefset{clang//virtio-mem/time}{41.09226279788547}
+\drefset{clang//virtio-mem/time_system}{5.741444444444444}
+\drefset{clang//virtio-mem/time_user}{483.96038888888893}
 \drefset{clang//virtio-mem+VFIO/gib_m}{507.59337033494313}
 \drefset{clang//virtio-mem+VFIO/time}{41.15067586104075}
 \drefset{clang//virtio-mem+VFIO/time_system}{6.067}
