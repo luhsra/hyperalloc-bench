@@ -1,56 +1,56 @@
-\drefset{clang//HyperAlloc/gib_m}{358.05521436468763}
-\drefset{clang//HyperAlloc/time}{40.78577717542648}
-\drefset{clang//HyperAlloc/time_system}{3.3143333333333334}
-\drefset{clang//HyperAlloc/time_user}{482.98955555555557}
-\drefset{clang//HyperAlloc+VFIO/gib_m}{359.43944616275365}
-\drefset{clang//HyperAlloc+VFIO/time}{40.8213159693612}
-\drefset{clang//HyperAlloc+VFIO/time_system}{3.3288888888888892}
-\drefset{clang//HyperAlloc+VFIO/time_user}{483.3968888888889}
-\drefset{clang//virtio-mem/gib_m}{479.4017641303804}
-\drefset{clang//virtio-mem/time}{41.09226279788547}
-\drefset{clang//virtio-mem/time_system}{5.741444444444444}
-\drefset{clang//virtio-mem/time_user}{483.96038888888893}
-\drefset{clang//virtio-mem+VFIO/gib_m}{507.59337033494313}
-\drefset{clang//virtio-mem+VFIO/time}{41.15067586104075}
-\drefset{clang//virtio-mem+VFIO/time_system}{6.067}
-\drefset{clang//virtio-mem+VFIO/time_user}{484.52477777777773}
-\drefset{clang/baseline/Buddy/gib_m}{658.9946666666666}
-\drefset{clang/baseline/Buddy/time}{41.196514607800374}
-\drefset{clang/baseline/Buddy/time_system}{6.2284444444444444}
-\drefset{clang/baseline/Buddy/time_user}{484.6968888888889}
-\drefset{clang/baseline/LLFree/gib_m}{649.5688888888889}
-\drefset{clang/baseline/LLFree/time}{40.598102209303114}
-\drefset{clang/baseline/LLFree/time_system}{2.6275}
-\drefset{clang/baseline/LLFree/time_user}{481.3017222222222}
-\drefset{clang/virtio-balloon/o=0 d=100 c=32/gib_m}{446.9051428599887}
-\drefset{clang/virtio-balloon/o=0 d=100 c=32/time}{61.16023981703652}
-\drefset{clang/virtio-balloon/o=0 d=100 c=32/time_system}{128.9986111111111}
-\drefset{clang/virtio-balloon/o=0 d=100 c=32/time_user}{598.7603888888889}
-\drefset{clang/virtio-balloon/o=0 d=100 c=512/gib_m}{450.469674451722}
-\drefset{clang/virtio-balloon/o=0 d=100 c=512/time}{61.67623890240987}
-\drefset{clang/virtio-balloon/o=0 d=100 c=512/time_system}{123.24105555555555}
-\drefset{clang/virtio-balloon/o=0 d=100 c=512/time_user}{609.3679444444446}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=32/gib_m}{384.4976037010617}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=32/time}{48.39448964728249}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=32/time_system}{55.27222222222222}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=32/time_user}{521.5438333333333}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=512/gib_m}{377.48839540184866}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=512/time}{48.39666695594787}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=512/time_system}{52.513888888888886}
-\drefset{clang/virtio-balloon/o=0 d=2000 c=512/time_user}{523.8506111111111}
-\drefset{clang/virtio-balloon/o=9 d=100 c=32/gib_m}{437.2097461940977}
-\drefset{clang/virtio-balloon/o=9 d=100 c=32/time}{41.19448616637124}
-\drefset{clang/virtio-balloon/o=9 d=100 c=32/time_system}{6.246444444444443}
-\drefset{clang/virtio-balloon/o=9 d=100 c=32/time_user}{484.9102222222222}
-\drefset{clang/virtio-balloon/o=9 d=100 c=512/gib_m}{434.4858773531384}
-\drefset{clang/virtio-balloon/o=9 d=100 c=512/time}{41.22623717387517}
-\drefset{clang/virtio-balloon/o=9 d=100 c=512/time_system}{7.089444444444443}
-\drefset{clang/virtio-balloon/o=9 d=100 c=512/time_user}{484.41311111111105}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=32/gib_m}{435.13998856841187}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=32/time}{41.27612724569109}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=32/time_system}{6.903444444444445}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=32/time_user}{485.0001666666667}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=512/gib_m}{430.8328684382968}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=512/time}{41.203649040063226}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=512/time_system}{6.110833333333333}
-\drefset{clang/virtio-balloon/o=9 d=2000 c=512/time_user}{484.9380555555556}
+\drefset{clang//HyperAlloc/gib_m}{357.16862175104353}
+\drefset{clang//HyperAlloc/time}{40.792842171589534}
+\drefset{clang//HyperAlloc/time_system}{3.350972222222222}
+\drefset{clang//HyperAlloc/time_user}{482.89877777777775}
+\drefset{clang//HyperAlloc+VFIO/gib_m}{358.4917456386354}
+\drefset{clang//HyperAlloc+VFIO/time}{40.83553523222606}
+\drefset{clang//HyperAlloc+VFIO/time_system}{3.2834444444444446}
+\drefset{clang//HyperAlloc+VFIO/time_user}{483.5420833333333}
+\drefset{clang//virtio-mem/gib_m}{483.90260665946533}
+\drefset{clang//virtio-mem/time}{41.16338067452113}
+\drefset{clang//virtio-mem/time_system}{6.220777777777777}
+\drefset{clang//virtio-mem/time_user}{484.27436111111115}
+\drefset{clang//virtio-mem+VFIO/gib_m}{502.48166307968563}
+\drefset{clang//virtio-mem+VFIO/time}{41.18049526545736}
+\drefset{clang//virtio-mem+VFIO/time_system}{6.198583333333333}
+\drefset{clang//virtio-mem+VFIO/time_user}{484.8426111111111}
+\drefset{clang/baseline/Buddy/gib_m}{658.5964444444444}
+\drefset{clang/baseline/Buddy/time}{41.17627623809708}
+\drefset{clang/baseline/Buddy/time_system}{6.0769722222222216}
+\drefset{clang/baseline/Buddy/time_user}{484.6841944444445}
+\drefset{clang/baseline/LLFree/gib_m}{649.2408888888889}
+\drefset{clang/baseline/LLFree/time}{40.586953016784456}
+\drefset{clang/baseline/LLFree/time_system}{2.672111111111111}
+\drefset{clang/baseline/LLFree/time_user}{481.1155833333334}
+\drefset{clang/virtio-balloon/o=0 d=100 c=32/gib_m}{449.2626173204846}
+\drefset{clang/virtio-balloon/o=0 d=100 c=32/time}{61.11401216453976}
+\drefset{clang/virtio-balloon/o=0 d=100 c=32/time_system}{128.37080555555556}
+\drefset{clang/virtio-balloon/o=0 d=100 c=32/time_user}{598.8656944444444}
+\drefset{clang/virtio-balloon/o=0 d=100 c=512/gib_m}{441.94703167268966}
+\drefset{clang/virtio-balloon/o=0 d=100 c=512/time}{61.13317393064499}
+\drefset{clang/virtio-balloon/o=0 d=100 c=512/time_system}{118.543}
+\drefset{clang/virtio-balloon/o=0 d=100 c=512/time_user}{607.687888888889}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=32/gib_m}{390.12818640311565}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=32/time}{48.627184976471796}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=32/time_system}{57.71922222222222}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=32/time_user}{521.9303333333334}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=512/gib_m}{379.0026185251342}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=512/time}{48.83691278364923}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=512/time_system}{56.87625}
+\drefset{clang/virtio-balloon/o=0 d=2000 c=512/time_user}{524.9135555555555}
+\drefset{clang/virtio-balloon/o=9 d=100 c=32/gib_m}{438.3068540861871}
+\drefset{clang/virtio-balloon/o=9 d=100 c=32/time}{41.22965735726886}
+\drefset{clang/virtio-balloon/o=9 d=100 c=32/time_system}{6.482194444444445}
+\drefset{clang/virtio-balloon/o=9 d=100 c=32/time_user}{485.08552777777777}
+\drefset{clang/virtio-balloon/o=9 d=100 c=512/gib_m}{435.4462235885726}
+\drefset{clang/virtio-balloon/o=9 d=100 c=512/time}{41.12993362347285}
+\drefset{clang/virtio-balloon/o=9 d=100 c=512/time_system}{6.262944444444444}
+\drefset{clang/virtio-balloon/o=9 d=100 c=512/time_user}{484.04486111111106}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=32/gib_m}{434.50076159355376}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=32/time}{41.22623041404618}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=32/time_system}{6.784166666666667}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=32/time_user}{484.7105833333333}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=512/gib_m}{431.3150233338144}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=512/time}{41.17116621931394}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=512/time_system}{6.017611111111111}
+\drefset{clang/virtio-balloon/o=9 d=2000 c=512/time_user}{484.6116388888889}

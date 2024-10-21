@@ -270,7 +270,8 @@ class Messure:
         # resize vm
         if self.args.mode.startswith("virtio-mem-"):
             # Follow free huge pages
-            free = int(huge * 2**(12+9) * 0.9) # 10% above allocated pages
+            free = int(huge * 2**(12+9) * 0.9) # 10% above huge pages
+            # free = small * 2**12 * 0.9 # 10% above small pages
             # Step size, amount of mem that is plugged/unplugged
             step = round(self.vm_resize.max * self.args.vmem_fraction)
             if free < step/2: # grow faster
