@@ -89,7 +89,7 @@ async def main():
         ps_proc = Process(qemu.pid)
 
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
-        qemu_wait_startup(qemu, root / "boot.txt")
+        await qemu_wait_startup(qemu, root / "boot.txt")
 
         if not args.nofault and args.module:
             name = Path(args.module).name

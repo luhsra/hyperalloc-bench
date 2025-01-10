@@ -231,7 +231,7 @@ async def main():
             qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
                         extra_args=BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, init_mem),
                         env={**os.environ, "QEMU_LLFREE_LOG": str(res_dir / "llfree_log.txt")}, vfio_group=args.vfio)
-            qemu_wait_startup(qemu, root / "boot.txt")
+            await qemu_wait_startup(qemu, root / "boot.txt")
             ps_proc = Process(qemu.pid)
 
             qmp = QMPClient("STREAM machine")

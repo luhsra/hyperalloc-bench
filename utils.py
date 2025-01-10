@@ -9,7 +9,7 @@ from datetime import datetime
 from itertools import chain
 from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT, check_call, check_output
-from time import sleep
+from asyncio import sleep
 from typing import IO, Any
 
 import pandas as pd
@@ -144,7 +144,8 @@ def qemu_vm(
     qmp_port: int = 5023,
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
-    vfio_group: int | None = None
+    vfio_group: int | None = None,
+    slice: str | None = None,
 ) -> Popen[str]:
     """Start a vm with the given configuration."""
     assert cores > 0 and cores % sockets == 0
@@ -161,6 +162,7 @@ def qemu_vm(
         #"-m", f"{mem}G",
         "-smp", f"{cores}",
         "-hda", hda,
+        "-snapshot",
         "-serial", "mon:stdio",
         "-nographic",
         "-kernel", kernel,
@@ -172,6 +174,11 @@ def qemu_vm(
         *extra_args,
         *vfio_args(vfio_group)
     ]
+
+    if slice:
+        base_args = [
+            "systemd-run", "--user", "--slice", slice, "--scope", *base_args
+        ]
 
     # Combine `-append`
     args = []
@@ -205,10 +212,10 @@ def qemu_vm(
     return process
 
 
-def qemu_wait_startup(qemu: Popen[str], logfile: Path):
+async def qemu_wait_startup(qemu: Popen[str], logfile: Path):
     count = 0
     while True:
-        sleep(3)
+        await sleep(3)
         assert qemu.poll() is None
         text = non_block_read(s) if (s := qemu.stdout) else ""
         if len(text) == 0:
