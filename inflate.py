@@ -93,8 +93,8 @@ async def main():
 
         if not args.nofault and args.module:
             name = Path(args.module).name
-            ssh.upload(args.module, name)
-            ssh.run(f"sudo insmod {name}")
+            await ssh.upload(args.module, name)
+            await ssh.run(f"sudo insmod {name}")
 
         qmp = QMPClient("STREAM machine")
         await qmp.connect(("127.0.0.1", args.qmp))
@@ -116,9 +116,9 @@ async def main():
 
             # Grow VM
             if not args.nofault:
-                ssh.run(f"./write -t{args.cores} -m{args.mem - 1}")
+                await ssh.run(f"./write -t{args.cores} -m{args.mem - 1}")
 
-            sleep(args.delay)
+            await sleep(args.delay)
 
             target_bytes = args.shrink_target * 1024**3
 
@@ -126,8 +126,8 @@ async def main():
             await resize.set(target_bytes)
             while (size := await resize.query()) > 1.01 * target_bytes:
                 print("inflating", fmt_bytes(size))
-                sleep(1)
-            sleep(args.delay)
+                await sleep(1)
+            await sleep(args.delay)
 
             print("RSS:", fmt_bytes(ps_proc.memory_info().rss), "target:", fmt_bytes(target_bytes))
 
@@ -135,17 +135,17 @@ async def main():
             await resize.set(max_bytes)
             while (size := await resize.query()) < 0.99 * max_bytes:
                 print("deflating", fmt_bytes(size))
-                sleep(1)
-            sleep(args.delay)
+                await sleep(1)
+            await sleep(args.delay)
 
             touch = 0
             touch2 = 0
             if not args.nofault and args.module:
                 allocs = int(args.mem - 1) * 1024**3 // 4096
-                ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
-                touch = parse_module_output(ssh.output("sudo cat /proc/alloc/out")) * allocs
-                ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
-                touch2 = parse_module_output(ssh.output("sudo cat /proc/alloc/out")) * allocs
+                await ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
+                touch = parse_module_output(await ssh.output("sudo cat /proc/alloc/out")) * allocs
+                await ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
+                touch2 = parse_module_output(await ssh.output("sudo cat /proc/alloc/out")) * allocs
 
             output = rm_ansi_escape(non_block_read(qemu.stdout))
             logfile.write(output)
@@ -164,10 +164,10 @@ async def main():
         if isinstance(e, CalledProcessError):
             if e.stdout: errfile.write(e.stdout)
             if e.stderr: errfile.write(e.stderr)
-
-    print("terminate...")
-    if qemu: qemu.terminate()
-    sleep(3)
+    finally:
+        print("terminate...")
+        if qemu: qemu.terminate()
+        await sleep(3)
 
 
 def parse_module_output(output: str) -> int:

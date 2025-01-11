@@ -8,7 +8,15 @@ from asyncio import sleep
 from typing import Any
 
 from measure import Measure
-from utils import BALLOON_CFG, SSHExec, non_block_read, qemu_vm, qemu_wait_startup, rm_ansi_escape, setup
+from utils import (
+    BALLOON_CFG,
+    SSHExec,
+    non_block_read,
+    qemu_vm,
+    qemu_wait_startup,
+    rm_ansi_escape,
+    setup,
+)
 from psutil import Process
 import signal
 from qemu.qmp import QMPClient
@@ -48,33 +56,49 @@ TARGET = {
     },
     "write": {
         "build": "./write -t`nproc` -m8",
-    }
+    },
 }
 
+
 class ModeAction(Action):
-    def __init__(self, option_strings: Sequence[str], dest: str,
-                 nargs: int | str | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        option_strings: Sequence[str],
+        dest: str,
+        nargs: int | str | None = None,
+        **kwargs,
+    ) -> None:
         assert nargs is None, "nargs not allowed"
         super().__init__(option_strings, dest, nargs, **kwargs)
 
-    def __call__(self, parser: ArgumentParser, namespace: Namespace,
-                 values: str | Sequence[Any] | None,
-                 option_string: str | None = None) -> None:
+    def __call__(
+        self,
+        parser: ArgumentParser,
+        namespace: Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
         assert isinstance(values, str)
-        assert values in BALLOON_CFG.keys(), f"mode has to be on of {list(BALLOON_CFG.keys())}"
+        assert (
+            values in BALLOON_CFG.keys()
+        ), f"mode has to be on of {list(BALLOON_CFG.keys())}"
 
         kind = values.split("-")[0]
         assert kind in DEFAULTS
 
-        if namespace.qemu is None: namespace.qemu = DEFAULTS[kind]["qemu"]
-        if namespace.kernel is None: namespace.kernel = DEFAULTS[kind]["kernel"]
-        if namespace.suffix is None: namespace.suffix = values
+        if namespace.qemu is None:
+            namespace.qemu = DEFAULTS[kind]["qemu"]
+        if namespace.kernel is None:
+            namespace.kernel = DEFAULTS[kind]["kernel"]
+        if namespace.suffix is None:
+            namespace.suffix = values
         setattr(namespace, self.dest, values)
 
 
 async def main():
     parser = ArgumentParser(
-        description="Compiling linux in a vm while monitoring memory usage")
+        description="Compiling linux in a vm while monitoring memory usage"
+    )
     parser.add_argument("--qemu")
     parser.add_argument("--kernel")
     parser.add_argument("--user", default="debian")
@@ -88,12 +112,16 @@ async def main():
     parser.add_argument("--frag", action="store_true")
     parser.add_argument("--perf", action="store_true")
     parser.add_argument("--delay", type=int, default=10)
-    parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
-                        required=True, action=ModeAction)
+    parser.add_argument(
+        "--mode", choices=list(BALLOON_CFG.keys()), required=True, action=ModeAction
+    )
     parser.add_argument("--target", choices=list(TARGET.keys()), required=True)
-    parser.add_argument("--vfio", type=int,
-                        help="IOMMU that should be passed into VM. This has to be bound to VFIO first!")
-    parser.add_argument("--vmem-fraction", type=float, default=1/16)
+    parser.add_argument(
+        "--vfio",
+        type=int,
+        help="IOMMU that should be passed into VM. This has to be bound to VFIO first!",
+    )
+    parser.add_argument("--vmem-fraction", type=float, default=1 / 16)
     parser.add_argument("--fpr-delay", type=int, help="Delay between reports in ms")
     parser.add_argument("--fpr-capacity", type=int, help="Size of the fpr buffer")
     parser.add_argument("--fpr-order", type=int, help="Report granularity")
@@ -105,6 +133,7 @@ async def main():
     i = 0
 
     qemu = None
+    client = None
 
     try:
         for i in range(args.iter):
@@ -118,8 +147,16 @@ async def main():
             if (x := args.fpr_order) is not None:
                 extra_args += ["-append", f"page_reporting.page_reporting_order={x}"]
 
-            qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img, qmp_port=args.qmp,
-                        extra_args=extra_args, vfio_group=args.vfio)
+            qemu = qemu_vm(
+                args.qemu,
+                args.port,
+                args.kernel,
+                args.cores,
+                hda=args.img,
+                qmp_port=args.qmp,
+                extra_args=extra_args,
+                vfio_group=args.vfio,
+            )
             ps_proc = Process(qemu.pid)
 
             print("started")
@@ -129,18 +166,26 @@ async def main():
             await qemu_wait_startup(qemu, root / f"boot_{i}.txt")
 
             # Check for the FPR configuration
+            fpr_path = "/sys/module/page_reporting/parameters/"
             if (x := args.fpr_delay) is not None:
-                assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_delay").strip())
+                assert x == int(
+                    (await ssh.output(f"cat {fpr_path}page_reporting_delay")).strip()
+                )
             if (x := args.fpr_capacity) is not None:
-                assert x == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_capacity").strip())
+                assert x == int(
+                    (await ssh.output(f"cat {fpr_path}page_reporting_capacity")).strip()
+                )
             if args.mode == "base-auto":
                 order = x if (x := args.fpr_order) is not None else 9
-                assert order == int(ssh.output("cat /sys/module/page_reporting/parameters/page_reporting_order").strip
-                ())
+                assert order == int(
+                    (await ssh.output(f"cat {fpr_path}page_reporting_order")).strip()
+                )
 
             client = QMPClient("compile vm")
             await client.connect(("127.0.0.1", args.qmp))
-            vm_resize = VMResize(client, "virtio-mem-movable", args.mem * 1024**3, min_mem * 1024**3)
+            vm_resize = VMResize(
+                client, "virtio-mem-movable", args.mem * 1024**3, min_mem * 1024**3
+            )
 
             if qemu.poll() is not None:
                 raise Exception("Qemu crashed")
@@ -150,7 +195,7 @@ async def main():
             mem_usage = (root / f"out_{i}.csv").open("w+")
 
             if "clean" in TARGET[args.target]:
-                ssh.run(TARGET[args.target]["clean"])
+                await ssh.run(TARGET[args.target]["clean"])
 
             # Start profiling
             if args.perf:
@@ -159,9 +204,14 @@ async def main():
                 # This does only work for intel though, AMD uses different values/formats
                 # For more info on filters, see: https://www.kernel.org/doc/html/latest/trace/events.html#event-filtering
                 # NOTE: The --filter arg is not documented for perf stat, but does seem to work anyways. Not sure if this is a bug...
-                perf = Popen(shlex.split(f"perf stat -e \"kvm:kvm_exit\" --filter \"exit_reason==48\" -e \"dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses\" -j -p {qemu.pid}"), stderr=perf_file)
+                perf = Popen(
+                    shlex.split(
+                        f'perf stat -e "kvm:kvm_exit" --filter "exit_reason==48" -e "dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses" -j -p {qemu.pid}'
+                    ),
+                    stderr=perf_file,
+                )
 
-            measure = Measure(i, ssh, vm_resize, ps_proc, root, mem_usage, args)
+            measure = Measure(i, ssh, ps_proc, root, mem_usage, args, vm_resize)
 
             await measure()
 
@@ -173,7 +223,9 @@ async def main():
                 print("start compile")
                 process = ssh.background(TARGET[args.target]["build"])
 
-                build_time = await measure.wait(condition=lambda: process.poll() is None, process=process)
+                build_time = await measure.wait(
+                    condition=lambda: process.poll() is None, process=process
+                )
                 build_end.append(build_time)
                 with (root / f"out_{i}.txt").open("a+") as f:
                     f.write(process.stdout.read())
@@ -195,17 +247,24 @@ async def main():
                 assert process.poll() is not None, "Clean has not terminated"
 
             # drop page cache
-            ssh.run(f"echo 1 | sudo tee /proc/sys/vm/drop_caches")
+            await ssh.run(f"echo 1 | sudo tee /proc/sys/vm/drop_caches")
             drop_end = await measure.wait(sec=args.delay)
 
-            (root / f"times_{i}.json").write_text(json.dumps({
-                "build": build_end, "delay": delay_end,
-                "clean": clean_end, "drop": drop_end, "cpu": {
-                    "total": t_total,
-                    "user": t_user,
-                    "system": t_system,
-                }
-            }))
+            (root / f"times_{i}.json").write_text(
+                json.dumps(
+                    {
+                        "build": build_end,
+                        "delay": delay_end,
+                        "clean": clean_end,
+                        "drop": drop_end,
+                        "cpu": {
+                            "total": t_total,
+                            "user": t_user,
+                            "system": t_system,
+                        },
+                    }
+                )
+            )
 
             if args.perf:
                 # Make sure perf finished writing the profile
@@ -215,21 +274,25 @@ async def main():
             with (root / f"out_{i}.txt").open("a+") as f:
                 f.write(rm_ansi_escape(non_block_read(qemu.stdout)))
 
-            print("terminate...")
-            await client.disconnect()
-            qemu.terminate()
-            await sleep(3)
-
     except Exception as e:
         (root / "exception.txt").write_text(str(e))
         if isinstance(e, CalledProcessError):
             with (root / f"error_{i}.txt").open("w+") as f:
-                if e.stdout: f.write(e.stdout)
-                if e.stderr: f.write(e.stderr)
+                if e.stdout:
+                    f.write(e.stdout)
+                if e.stderr:
+                    f.write(e.stderr)
         if qemu:
             (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
-            qemu.terminate()
         raise e
+    finally:
+        print("terminate...")
+        if client:
+            await client.disconnect()
+        if qemu:
+            qemu.terminate()
+        await sleep(3)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

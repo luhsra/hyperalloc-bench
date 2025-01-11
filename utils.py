@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable, Iterable
 import fcntl
 import json
@@ -8,13 +9,13 @@ from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from subprocess import Popen, PIPE, STDOUT, check_call, check_output
+from subprocess import CalledProcessError, Popen, PIPE, STDOUT, check_call, check_output
 from asyncio import sleep
 from typing import IO, Any
 
 import pandas as pd
 
-ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
 def setup(name: str, parser: ArgumentParser, custom=None) -> tuple[Namespace, Path]:
@@ -27,8 +28,7 @@ def setup(name: str, parser: ArgumentParser, custom=None) -> tuple[Namespace, Pa
         custom: Any custom metadata that should be saved
     """
     parser.add_argument("--output", help="Name of the output directory")
-    parser.add_argument(
-        "--suffix", help="Suffix added to the name of the output directory")
+    parser.add_argument("--suffix", help="Suffix added to the output directory")
     args = parser.parse_args()
 
     output = args.output if args.output else timestamp()
@@ -55,7 +55,8 @@ def rm_ansi_escape(input: str) -> str:
 
 
 def non_block_read(output: IO[str] | None) -> str:
-    if output is None: return ""
+    if output is None:
+        return ""
 
     fd = output.fileno()
     fl = fcntl.fcntl(fd, fcntl.F_GETFL)
@@ -74,20 +75,38 @@ def fmt_bytes(bytes: int) -> str:
     suffix = ["GiB", "MiB", "KiB"]
     for i, s in enumerate(suffix):
         fac = 1024 ** (len(suffix) - i)
-        if bytes >= fac: return f"{bytes / fac:.2f} {s}"
+        if bytes >= fac:
+            return f"{bytes / fac:.2f} {s}"
     return f"{bytes} B"
 
 
 BALLOON_CFG: dict[str, Callable[[int, int, int, int], list[str]]] = {
-    "base-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
-    "base-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, True),
-    "huge-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, False),
-    "huge-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(cores, mem, True),
-    "llfree-manual": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(cores, mem, False),
-    "llfree-auto": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(cores, mem, True),
-    "virtio-mem-kernel": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(mem, min_mem, init_mem, True),
-    "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(mem, min_mem, init_mem, False),
+    "base-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
+        cores, mem, False
+    ),
+    "base-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
+        cores, mem, True
+    ),
+    "huge-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
+        cores, mem, False
+    ),
+    "huge-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
+        cores, mem, True
+    ),
+    "llfree-manual": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(
+        cores, mem, False
+    ),
+    "llfree-auto": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(
+        cores, mem, True
+    ),
+    "virtio-mem-kernel": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(
+        mem, min_mem, init_mem, True
+    ),
+    "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(
+        mem, min_mem, init_mem, False
+    ),
 }
+
 
 def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
     per_core_iothreads = [f"iothread{c}" for c in range(cores)]
@@ -100,31 +119,50 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
     }
     return [
-        "-m", f"{mem}G",
-        "-object", f"iothread,id={auto_mode_iothread}",
+        "-m",
+        f"{mem}G",
+        "-object",
+        f"iothread,id={auto_mode_iothread}",
         *chain(*[["-object", f"iothread,id={t}"] for t in per_core_iothreads]),
-        "-device", json.dumps(device),
+        "-device",
+        json.dumps(device),
     ]
+
 
 def vfio_args(iommu_group: int | None) -> list[str]:
     if iommu_group is None:
         return []
-    assert (Path("/dev/vfio") / str(iommu_group)).exists(), "IOMMU Group is not bound to VFIO!"
+    assert (
+        Path("/dev/vfio") / str(iommu_group)
+    ).exists(), "IOMMU Group is not bound to VFIO!"
     path = Path("/sys/kernel/iommu_groups") / str(iommu_group) / "devices"
-    return list(chain(*[
-        ["-device", json.dumps({
-            "driver": "vfio-pci", "host": d.name
-        })] for d in path.iterdir()
-    ]))
+    return list(
+        chain(
+            *[
+                ["-device", json.dumps({"driver": "vfio-pci", "host": d.name})]
+                for d in path.iterdir()
+            ]
+        )
+    )
+
 
 def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
-    return ["-m", f"{mem}G","-device", json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto})]
+    return [
+        "-m",
+        f"{mem}G",
+        "-device",
+        json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto}),
+    ]
 
-def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int, kernel: bool) -> list[str]:
+
+def qemu_virtio_mem_args(
+    mem: int, min_mem: int, init_mem: int, kernel: bool
+) -> list[str]:
     default_state = "online_kernel" if kernel else "online_movable"
     vmem_size = round(mem - min_mem)
     req_size = round(init_mem - min_mem)
     return [
+        # fmt: off
         "-m", f"{min_mem}G,maxmem={mem}G",
         "-append", f"memhp_default_state={default_state}",
         "-machine", "pc",
@@ -158,6 +196,7 @@ def qemu_vm(
         extra_args = []
 
     base_args = [
+        # fmt: off
         qemu,
         #"-m", f"{mem}G",
         "-smp", f"{cores}",
@@ -172,21 +211,21 @@ def qemu_vm(
         "-no-reboot",
         "--cpu", "host",
         *extra_args,
-        *vfio_args(vfio_group)
+        *vfio_args(vfio_group),
     ]
 
     if slice:
-        base_args = [
-            "systemd-run", "--user", "--slice", slice, "--scope", *base_args
-        ]
+        base_args = ["systemd-run", "--user", "--slice", slice, "--scope", *base_args]
 
     # Combine `-append`
     args = []
     cmdline = []
     is_append = False
     for arg in base_args:
-        if is_append: cmdline.append(arg)
-        elif arg != "-append": args.append(arg)
+        if is_append:
+            cmdline.append(arg)
+        elif arg != "-append":
+            args.append(arg)
         is_append = arg == "-append"
     args += ["-append", " ".join(cmdline)]
 
@@ -239,23 +278,53 @@ class SSHExec:
         self.port = port
 
     def _ssh(self) -> list[str]:
-        return ["ssh", "-o StrictHostKeyChecking=no",
-                f"{self.user}@{self.host}", f"-p {self.port}"]
+        return [
+            "ssh",
+            "-o NoHostAuthenticationForLocalhost=yes",
+            f"{self.user}@{self.host}",
+            f"-p {self.port}",
+        ]
 
-    def run(self, cmd: str, timeout: float | None = None, args: list[str] | None = None):
+    async def run(
+        self, cmd: str, timeout: float | None = None, args: list[str] | None = None
+    ):
         """Run cmd and wait for its termination"""
         if not args:
             args = []
         ssh_args = [*self._ssh(), *args, cmd]
-        check_call(ssh_args, timeout=timeout)
+        async with asyncio.timeout(timeout):
+            process = await asyncio.create_subprocess_exec(*ssh_args)
+            if (ret := await process.wait()) != 0:
+                raise CalledProcessError(ret, ssh_args)
 
-    def output(self, cmd: str, timeout: float | None = None, args: list[str] | None = None) -> str:
+    async def output(
+        self, cmd: str, timeout: float | None = None, args: list[str] | None = None
+    ) -> str:
         """Run cmd and capture its output"""
         if not args:
             args = []
         ssh_args = [*self._ssh(), *args, cmd]
-        return check_output(ssh_args, text=True, stderr=STDOUT, timeout=timeout)
+        async with asyncio.timeout(timeout):
+            process = await asyncio.create_subprocess_exec(
+                *ssh_args, stdout=PIPE, stderr=STDOUT
+            )
+            stdout, _ = await process.communicate()
+            if process.returncode != 0:
+                raise CalledProcessError(process.returncode, ssh_args, stdout.decode())
+            return stdout.decode()
 
+    async def process(
+        self, cmd: str, args: list[str] | None = None
+    ) -> asyncio.subprocess.Process:
+        """Run cmd and return the process"""
+        if not args:
+            args = []
+        ssh_args = [*self._ssh(), *args, cmd]
+        return await asyncio.create_subprocess_exec(
+            *ssh_args, stdout=PIPE, stderr=STDOUT
+        )
+
+    # Deprecated: Use coroutines instead
     def background(self, cmd: str, args: list[str] | None = None) -> Popen[str]:
         """Run cmd in the background."""
         if not args:
@@ -263,46 +332,68 @@ class SSHExec:
         ssh_args = [*self._ssh(), *args, cmd]
         return Popen(ssh_args, stdout=PIPE, stderr=STDOUT, text=True)
 
-    def upload(self, file: Path, target: str):
+    async def upload(self, source: Path, dest: str):
         """Upload a file over ssh."""
-        check_call(
-            ["scp", "-o StrictHostKeyChecking=no", f"-P{self.port}",
-             file, f"{self.user}@{self.host}:{target}"], timeout=30)
+        async with asyncio.timeout(30):
+            ssh_args = [
+                # fmt: off
+                "scp", "-o NoHostAuthenticationForLocalhost=yes", f"-P{self.port}",
+                source, f"{self.user}@{self.host}:{dest}",
+            ]
+            process = await asyncio.create_subprocess_exec(*ssh_args)
+            if (ret := await process.wait()) != 0:
+                raise CalledProcessError(ret, ssh_args)
 
-    def download(self, source: Path, dest: Path):
+    async def download(self, source: Path, dest: Path):
         """Download a file over ssh."""
-        check_call(
-            ["scp", "-o StrictHostKeyChecking=no", f"-P{self.port}",
-                f"{self.user}@{self.host}:{source}", dest], timeout=30)
+        async with asyncio.timeout(30):
+            ssh_args = [
+                # fmt: off
+                "scp", "-o NoHostAuthenticationForLocalhost=yes", f"-P{self.port}",
+                f"{self.user}@{self.host}:{source}", dest,
+            ]
+            process = await asyncio.create_subprocess_exec(*ssh_args)
+            if (ret := await process.wait()) != 0:
+                raise CalledProcessError(ret, ssh_args)
+
 
 def free_pages(buddyinfo: str) -> tuple[int, int]:
     """Calculates the number of free small and huge pages from the buddy allocator state."""
-    small = 0
-    huge = 0
-    for line in buddyinfo.splitlines():
-        orders = line.split()[4:]
-        for order, free in enumerate(orders):
-            small += int(free) << order
-            if order >= 9:
-                huge += int(free) << (order - 9)
-    return small, huge
+    try:
+        small = 0
+        huge = 0
+        for line in buddyinfo.splitlines():
+            orders = line.split()[4:]
+            for order, free in enumerate(orders):
+                small += int(free) << order
+                if order >= 9:
+                    huge += int(free) << (order - 9)
+        return small, huge
+    except Exception as e:
+        print(f"Invalid buddyinfo: '{buddyinfo}'")
+        raise e
 
 
 def parse_meminfo(meminfo: str) -> dict[str, int]:
     """Parses linux meminfo to a dict"""
+
     def parse_line(line: str) -> tuple[str, int]:
         [k, v] = map(str.strip, line.split(":"))
         v = (int(v[:-3]) * 1024) if v.endswith(" kB") else int(v)
         return k, v
 
-    return dict(map(parse_line, meminfo.strip().splitlines()))
+    try:
+        return dict(map(parse_line, meminfo.strip().splitlines()))
+    except Exception as e:
+        print(f"Invalid meminfo: '{meminfo}'")
+        raise e
 
 
 def parse_zoneinfo(zoneinfo: str, key: str) -> int:
     res = 0
     for line in zoneinfo.splitlines():
         if (i := line.find(key)) >= 0:
-            res += int(line[i + len(key) + 1:].strip())
+            res += int(line[i + len(key) + 1 :].strip())
     return res
 
 
@@ -318,7 +409,7 @@ def sys_info() -> dict:
 def mem_info() -> dict:
     meminfo = parse_meminfo(Path("/proc/meminfo").read_text())
     whitelist = {"MemTotal", "MemFree", "MemAvailable", "Cached"}
-    return { k: v for k, v in meminfo.items() if k in whitelist }
+    return {k: v for k, v in meminfo.items() if k in whitelist}
 
 
 def git_info(args: dict[str, object]) -> dict[str, Any]:
@@ -333,12 +424,14 @@ def git_info(args: dict[str, object]) -> dict[str, Any]:
         output = {"commit": "-", "remote": "-"}
         try:
             output["commit"] = check_output(
-                ["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
+                ["git", "rev-parse", "HEAD"], cwd=path, text=True
+            ).strip()
         except Exception:
             pass
         try:
             output["remote"] = check_output(
-                ["git", "remote", "get-url", "origin"], cwd=path, text=True).strip()
+                ["git", "remote", "get-url", "origin"], cwd=path, text=True
+            ).strip()
         except Exception:
             pass
         return output
@@ -372,12 +465,20 @@ def dref_dataframe(name: str, dir: Path, groupby: list[str], data: pd.DataFrame)
     with (dir / f"{name}.dref").open("w+") as f:
         dump_dref(f, name, out)
 
-def dref_dataframe_multi(name: str, dir: Path, groupby: list[str], vars: list[str], data: pd.DataFrame):
+
+def dref_dataframe_multi(
+    name: str, dir: Path, groupby: list[str], vars: list[str], data: pd.DataFrame
+):
     out = {}
     for var in vars:
         ignored_cols = vars.copy()
         ignored_cols.remove(var)
-        d = data[data.columns.difference(ignored_cols)].dropna(axis=0).groupby(groupby).mean(numeric_only=True)
+        d = (
+            data[data.columns.difference(ignored_cols)]
+            .dropna(axis=0)
+            .groupby(groupby)
+            .mean(numeric_only=True)
+        )
         for index, row in d.iterrows():
             if isinstance(index, Iterable):
                 index = "/".join(map(str, index))
