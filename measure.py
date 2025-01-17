@@ -28,6 +28,7 @@ class Measure:
         mem_usage: IO[str],
         args: Namespace,
         vm_resize: VMResize | None = None,
+        time_start: float | None = None,
     ) -> None:
         self.i = i
         self.ssh = ssh
@@ -45,7 +46,7 @@ class Measure:
         times = self.ps_proc.cpu_times()
         self._times_user = times.user
         self._times_system = times.system
-        self._time = time()
+        self._time = time_start or time()
         self._vm_stats_task: Task[tuple[int, int, int, int]] | None = None
 
     async def __call__(
