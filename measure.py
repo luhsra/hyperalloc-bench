@@ -2,6 +2,7 @@ from argparse import Namespace
 import asyncio
 from asyncio import Task, sleep
 from collections.abc import Callable
+from math import nan
 from pathlib import Path
 from subprocess import CalledProcessError, Popen
 from time import time
@@ -61,7 +62,7 @@ class Measure:
                 - parse_zoneinfo(zoneinfo, "managed ")
             ) * 2**12
 
-        small, huge, cached, total = 0, 0, 0, 0
+        small, huge, cached, total = nan, nan, nan, nan
         if self._vm_stats_task is None:
             self._vm_stats_task = asyncio.create_task(self.vm_stats())
         done, _ = await asyncio.wait({self._vm_stats_task}, timeout=0.5)

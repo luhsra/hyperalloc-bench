@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import shlex
 from time import time
-from subprocess import CalledProcessError, check_call
+from subprocess import CalledProcessError, Popen, check_call
 from typing import Any
 from qemu.qmp import QMPClient
 
@@ -155,31 +155,36 @@ async def main():
         MemoryMax=f"{mem}G", MemoryHigh=f"{args.high_mem or mem}G"
     ) as slice:
         print("Running slice", slice)
-        times = []
+
         for i in range(args.iter):
+            vms = []
+            for id in range(args.vms):
+                dir = root / f"vm_{id}"
+                dir.mkdir()
+                vms.append(asyncio.create_task(boot_vm(args, dir, id, slice.name, i)))
+
+            vms = await asyncio.gather(*vms)
+
             time_start = time()
+
+            times = []
             async with asyncio.TaskGroup() as group:
-                for id in range(args.vms):
-                    group.create_task(
-                        exec_vm(args, root, id, slice.name, time_start, i)
-                    )
+                for id, vm in enumerate(vms):
+                    dir = root / f"vm_{id}"
+                    group.create_task(exec_vm(args, dir, id, vm, time_start, i))
             times.append(time() - time_start)
 
-        (root / "time.txt").write_text(json.dumps({"total": times}))
+            (root / f"time_{i}.txt").write_text(json.dumps({"total": times}))
 
 
-async def exec_vm(
-    args: Namespace, root: Path, id: int, slice: str, time_start: float, i: int
-):
-    ssh = SSHExec(args.user, port=args.port + id)
+async def boot_vm(
+    args: Namespace, root: Path, id: int, slice: str, i: int
+) -> Popen[str]:
     qemu = None
-    client = None
-
-    root = root / f"vm_{id}"
-    root.mkdir()
+    ssh = SSHExec(args.user, port=args.port + id)
 
     try:
-        print("start qemu...")
+        print(f"start vm {id}...")
         min_mem = round(args.mem / 8)
         extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem)
 
@@ -194,14 +199,39 @@ async def exec_vm(
             vfio_group=args.vfio,
             slice=slice,
         )
-        ps_proc = Process(qemu.pid)
-
-        print("started")
+        print(f"started {id}")
         if i == 0:
             (root / "cmd.sh").write_text(shlex.join(qemu.args))
 
         await qemu_wait_startup(qemu, root / f"boot_{i}.txt")
 
+        if qemu.poll() is not None:
+            raise Exception("Qemu crashed")
+
+        if "clean" in TARGET[args.target]:
+            await ssh.run(TARGET[args.target]["clean"])
+
+    except Exception as e:
+        (root / "exception.txt").write_text(str(e))
+        if isinstance(e, CalledProcessError):
+            with (root / f"error_{i}.txt").open("w+") as f:
+                if e.stdout:
+                    f.write(e.stdout)
+                if e.stderr:
+                    f.write(e.stderr)
+        if qemu:
+            (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
+            qemu.terminate()
+        raise e
+
+    return qemu
+
+
+async def exec_vm(
+    args: Namespace, root: Path, id: int, qemu: Popen[str], time_start: float, i: int
+):
+    # client = None
+    try:
         # client = QMPClient("compile vm")
         # await client.connect(("127.0.0.1", args.qmp + id))
         # vm_resize = VMResize(
@@ -211,26 +241,27 @@ async def exec_vm(
         if qemu.poll() is not None:
             raise Exception("Qemu crashed")
 
-        print(f"Exec i={i} c={args.cores}")
+        print(f"Exec vm={id} i={i} c={args.cores}")
 
+        ssh = SSHExec(args.user, port=args.port + id)
         mem_usage = (root / f"out_{i}.csv").open("w+")
-
-        # Shift the start of the measurements
-        await sleep(args.delay / args.vms * id)
-
-        if "clean" in TARGET[args.target]:
-            await ssh.run(TARGET[args.target]["clean"])
-
+        ps_proc = Process(qemu.pid)
         measure = Measure(i, ssh, ps_proc, root, mem_usage, args, time_start=time_start)
-
         await measure()
 
-        build_end = []
-        delay_end = []
+        # time slot for the next benchmark
+        timeslot = time_start + (args.delay / args.vms * id) + args.delay
 
+        build_start = []
+        build_end = []
+        clean_end = []
         for r in range(args.repeat):
+            await measure.wait(sec=timeslot - time())
+            timeslot += args.delay
+
             # Compilation
-            print("start compile")
+            build_start.append(measure.sec())
+            print(f"start compile {id}: {build_start[-1]}")
             process = await ssh.process(TARGET[args.target]["build"])
 
             build_time = await measure.wait(process=process)
@@ -245,29 +276,30 @@ async def exec_vm(
                 if process.stdout:
                     f.write(await process.stdout.read())
 
-            # Delay after the compilation
-            delay_end.append(await measure.wait(sec=args.delay))
-
-        t_total, t_user, t_system = measure.times()
-
-        # Clean
-        clean_end = None
-        if "clean" in TARGET[args.target]:
-            process = await ssh.process(TARGET[args.target]["clean"])
-            clean_end = await measure.wait(sec=args.delay)
-            async with asyncio.timeout(3):
-                if (ret := await process.wait()) != 0:
+            # Optional clean command
+            if "clean" in TARGET[args.target]:
+                process = await ssh.process(TARGET[args.target]["clean"])
+                clean_time = await measure.wait(process=process)
+                if process.returncode != 0:
                     raise CalledProcessError(
-                        ret,
+                        process.returncode,
                         TARGET[args.target]["clean"],
                         await process.stdout.read(),
                     )
+                clean_end.append(clean_time)
+                with (root / f"out_{i}.txt").open("ab+") as f:
+                    if process.stdout:
+                        f.write(await process.stdout.read())
+
+        await measure.wait(sec=timeslot - time())
+
+        t_total, t_user, t_system = measure.times()
 
         (root / f"times_{i}.json").write_text(
             json.dumps(
                 {
+                    "start": build_start,
                     "build": build_end,
-                    "delay": delay_end,
                     "clean": clean_end,
                     "cpu": {
                         "total": t_total,
@@ -289,15 +321,13 @@ async def exec_vm(
                     f.write(e.stdout)
                 if e.stderr:
                     f.write(e.stderr)
-        if qemu:
-            (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
+        (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
         raise e
     finally:
         print("terminate...")
-        if client:
-            await client.disconnect()
-        if qemu:
-            qemu.terminate()
+        # if client:
+        #     await client.disconnect()
+        qemu.terminate()
         await sleep(3)
 
 
