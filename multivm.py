@@ -198,6 +198,7 @@ async def boot_vm(
             extra_args=extra_args,
             vfio_group=args.vfio,
             slice=slice,
+            core_start=id * args.cores,
         )
         print(f"started {id}")
         if i == 0:
