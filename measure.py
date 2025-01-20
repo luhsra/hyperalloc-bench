@@ -86,7 +86,7 @@ class Measure:
                     try:
                         async with asyncio.timeout(0.5):
                             out = await process.stdout.read(4096)
-                            f.write(rm_ansi_escape(out.decode()))
+                            f.write(rm_ansi_escape(out.decode(errors="replace")))
                     except asyncio.TimeoutError:
                         pass
 

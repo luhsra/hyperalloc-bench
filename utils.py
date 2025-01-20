@@ -184,6 +184,7 @@ def qemu_vm(
     env: dict[str, str] | None = None,
     vfio_group: int | None = None,
     slice: str | None = None,
+    core_start: int = 0,
 ) -> Popen[str]:
     """Start a vm with the given configuration."""
     assert cores > 0 and cores % sockets == 0
@@ -243,7 +244,7 @@ def qemu_vm(
         step = 2
     assert cores <= physical, "Not enough cores"
 
-    cpu_set = [x * step for x in range(0, cores)]
+    cpu_set = [x * step for x in range(core_start, core_start + cores)]
 
     q = psutil.Process(process.pid)
     q.cpu_affinity(cpu_set)
@@ -310,8 +311,8 @@ class SSHExec:
             )
             stdout, _ = await process.communicate()
             if process.returncode != 0:
-                raise CalledProcessError(process.returncode, ssh_args, stdout.decode())
-            return stdout.decode()
+                raise CalledProcessError(process.returncode, ssh_args, stdout.decode(errors="replace"))
+            return stdout.decode(errors="replace")
 
     async def process(
         self, cmd: str, args: list[str] | None = None

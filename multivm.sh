@@ -10,7 +10,9 @@ ARGS="--target write -m10 -c12 --delay 40 --repeat 10 --vms 4"
 # python3 multivm.py --mode base-auto --suffix write-base-auto $ARGS
 # python3 multivm.py --mode llfree-auto --suffix write-llfree-auto $ARGS
 
-ARGS="--target clang -m16 -c12 --delay 3600 --repeat 10 --vms 4"
-python3 multivm.py --mode base-manual --suffix write-base-manual $ARGS
-python3 multivm.py --mode base-auto --suffix write-base-auto $ARGS
-python3 multivm.py --mode llfree-auto --suffix write-llfree-auto $ARGS
+# clang takes about 40min on 12 cores
+# 4 benchmarks at the same time, lets restart every 3h
+ARGS="--target clang -m16 -c8 --delay 7200 --repeat 3 --vms 3"
+python3 multivm.py --mode base-manual --suffix clang-base-manual $ARGS
+python3 multivm.py --mode base-auto --suffix clang-base-auto $ARGS
+python3 multivm.py --mode llfree-auto --suffix clang-llfree-auto $ARGS

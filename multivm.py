@@ -250,13 +250,13 @@ async def exec_vm(
         await measure()
 
         # time slot for the next benchmark
-        timeslot = time_start + (args.delay / args.vms * id) + args.delay
+        timeslot = time_start + (args.delay / args.vms * id)
 
         build_start = []
         build_end = []
         clean_end = []
         for r in range(args.repeat):
-            await measure.wait(sec=timeslot - time())
+            await measure.wait(sec=max(0, timeslot - time()))
             timeslot += args.delay
 
             # Compilation
@@ -291,7 +291,7 @@ async def exec_vm(
                     if process.stdout:
                         f.write(await process.stdout.read())
 
-        await measure.wait(sec=timeslot - time())
+        await measure.wait(sec=args.delay / args.vms)
 
         t_total, t_user, t_system = measure.times()
 
