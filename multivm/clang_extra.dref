@@ -1,3 +1,3 @@
-\drefset{clang/multivm/Baseline/gib_min}{21934.619608712193}
-\drefset{clang/multivm/Free-Page-Reporting/gib_min}{19467.497301170664}
-\drefset{clang/multivm/HyperAlloc/gib_min}{14732.89519938183}
+\drefset{clang/multivm/Baseline/gib_min}{14591.151776930492}
+\drefset{clang/multivm/Free-Page-Reporting/gib_min}{12286.703814752262}
+\drefset{clang/multivm/HyperAlloc/gib_min}{8427.558012120246}

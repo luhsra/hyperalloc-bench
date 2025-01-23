@@ -192,8 +192,6 @@ async def main():
 
             print(f"Exec i={i} c={args.cores}")
 
-            mem_usage = (root / f"out_{i}.csv").open("w+")
-
             if "clean" in TARGET[args.target]:
                 await ssh.run(TARGET[args.target]["clean"])
 
@@ -211,7 +209,7 @@ async def main():
                     stderr=perf_file,
                 )
 
-            measure = Measure(i, ssh, ps_proc, root, mem_usage, args, vm_resize)
+            measure = Measure(root, i, ssh, ps_proc, args, vm_resize)
 
             await measure()
 

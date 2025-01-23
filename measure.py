@@ -22,27 +22,25 @@ from utils import (
 class Measure:
     def __init__(
         self,
+        root: Path,
         i: int,
         ssh: SSHExec,
         ps_proc: Process,
-        root: Path,
-        mem_usage: IO[str],
         args: Namespace,
         vm_resize: VMResize | None = None,
         time_start: float | None = None,
     ) -> None:
         self.i = i
         self.ssh = ssh
+        self.root = root
+        self.args = args
         self.vm_resize = vm_resize
         self.ps_proc = ps_proc
-        self.root = root
-        self.mem_usage = mem_usage
-        self.args = args
 
         # A bit of memory is reserved for kernel stuff
         self._reserved_mem = None
-        self.mem_usage.write("time,rss,small,huge,cached,total\n")
-        self.mem_usage.flush()
+        with (self.root / f"out_{self.i}.csv").open("a+") as mem_usage:
+            mem_usage.write("time,rss,small,huge,cached,total\n")
 
         times = self.ps_proc.cpu_times()
         self._times_user = times.user
@@ -56,10 +54,9 @@ class Measure:
         sec = self.sec()
 
         if self._reserved_mem == None:
-            zoneinfo = await self.ssh.output("cat /proc/zoneinfo")
+            z = await self.ssh.output("cat /proc/zoneinfo")
             self._reserved_mem = (
-                parse_zoneinfo(zoneinfo, "present ")
-                - parse_zoneinfo(zoneinfo, "managed ")
+                parse_zoneinfo(z, "present ") - parse_zoneinfo(z, "managed ")
             ) * 2**12
 
         small, huge, cached, total = nan, nan, nan, nan
@@ -71,8 +68,8 @@ class Measure:
             self._vm_stats_task = None
 
         rss = self.ps_proc.memory_info().rss
-        self.mem_usage.write(f"{sec:.2f},{rss},{small},{huge},{cached},{total}\n")
-        self.mem_usage.flush()
+        with (self.root / f"out_{self.i}.csv").open("a+") as mem_usage:
+            mem_usage.write(f"{sec:.2f},{rss},{small},{huge},{cached},{total}\n")
 
         if self.args.frag:
             output = await self.ssh.output("cat /proc/llfree_frag")

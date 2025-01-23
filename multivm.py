@@ -124,6 +124,10 @@ class SystemdSlice:
         check_call(["systemctl", "--user", "daemon-reload"])
 
 
+def min_memory(mem: int) -> int:
+    return round(mem / 8)
+
+
 async def main():
     parser = ArgumentParser(
         description="Compiling linux in a vm while monitoring memory usage"
@@ -140,6 +144,7 @@ async def main():
     parser.add_argument("-r", "--repeat", type=int, default=1)
     parser.add_argument("--frag", action="store_true")
     parser.add_argument("--delay", type=int, default=10)
+    parser.add_argument("--simultaneous", action="store_true")
     parser.add_argument(
         "--mode", choices=[*BALLOON_CFG.keys()], required=True, action=ModeAction
     )
@@ -185,7 +190,7 @@ async def boot_vm(
 
     try:
         print(f"start vm {id}...")
-        min_mem = round(args.mem / 8)
+        min_mem = min_memory(args.mem)
         extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem)
 
         qemu = qemu_vm(
@@ -214,15 +219,15 @@ async def boot_vm(
 
     except Exception as e:
         (root / "exception.txt").write_text(str(e))
-        if isinstance(e, CalledProcessError):
-            with (root / f"error_{i}.txt").open("w+") as f:
+        with (root / f"error.txt").open("w+") as f:
+            if isinstance(e, CalledProcessError):
                 if e.stdout:
                     f.write(e.stdout)
                 if e.stderr:
                     f.write(e.stderr)
-        if qemu:
-            (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
-            qemu.terminate()
+            if qemu:
+                f.write(rm_ansi_escape(non_block_read(qemu.stdout)))
+                qemu.terminate()
         raise e
 
     return qemu
@@ -231,13 +236,16 @@ async def boot_vm(
 async def exec_vm(
     args: Namespace, root: Path, id: int, qemu: Popen[str], time_start: float, i: int
 ):
-    # client = None
+    client = None
     try:
-        # client = QMPClient("compile vm")
-        # await client.connect(("127.0.0.1", args.qmp + id))
-        # vm_resize = VMResize(
-        #     client, "virtio-mem-movable", args.mem * 1024**3, min_mem * 1024**3
-        # )
+        client = QMPClient("compile vm")
+        await client.connect(("127.0.0.1", args.qmp + id))
+        vm_resize = VMResize(
+            client,
+            "virtio-mem-movable",
+            args.mem * 1024**3,
+            min_memory(args.mem) * 1024**3,
+        )
 
         if qemu.poll() is not None:
             raise Exception("Qemu crashed")
@@ -245,13 +253,22 @@ async def exec_vm(
         print(f"Exec vm={id} i={i} c={args.cores}")
 
         ssh = SSHExec(args.user, port=args.port + id)
-        mem_usage = (root / f"out_{i}.csv").open("w+")
         ps_proc = Process(qemu.pid)
-        measure = Measure(i, ssh, ps_proc, root, mem_usage, args, time_start=time_start)
+        measure = Measure(
+            root,
+            i,
+            ssh,
+            ps_proc,
+            args,
+            vm_resize,
+            time_start,
+        )
         await measure()
 
-        # time slot for the next benchmark
-        timeslot = time_start + (args.delay / args.vms * id)
+        # time slot for the next run
+        timeslot = time_start
+        if not args.simultaneous:
+            timeslot += args.delay / args.vms * id
 
         build_start = []
         build_end = []
@@ -292,6 +309,7 @@ async def exec_vm(
                     if process.stdout:
                         f.write(await process.stdout.read())
 
+        # cooldown
         await measure.wait(sec=args.delay / args.vms)
 
         t_total, t_user, t_system = measure.times()
@@ -316,18 +334,17 @@ async def exec_vm(
 
     except Exception as e:
         (root / "exception.txt").write_text(str(e))
-        if isinstance(e, CalledProcessError):
-            with (root / f"error_{i}.txt").open("w+") as f:
-                if e.stdout:
-                    f.write(e.stdout)
-                if e.stderr:
-                    f.write(e.stderr)
-        (root / "error.txt").write_text(rm_ansi_escape(non_block_read(qemu.stdout)))
+        with (root / "error.txt").open("w+") as f:
+            if isinstance(e, CalledProcessError):
+                f.write(e.stdout or "")
+                f.write(e.stderr or "")
+            f.write("\n\n" + "=" * 80 + "\n\n")
+            f.write(rm_ansi_escape(non_block_read(qemu.stdout)))
         raise e
     finally:
         print("terminate...")
-        # if client:
-        #     await client.disconnect()
+        if client:
+            await client.disconnect()
         qemu.terminate()
         await sleep(3)
 
