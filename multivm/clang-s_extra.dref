@@ -1,3 +1,9 @@
 \drefset{clang-s/multivm/Baseline/gib_min}{12875.255358811377}
-\drefset{clang-s/multivm/Free-Page-Reporting/gib_min}{11709.871031956354}
+\drefset{clang-s/multivm/Baseline/gib_max}{40.751163482666016}
+\drefset{clang-s/multivm/Baseline/vm_gib_max}{13.758354187011719}
+\drefset{clang-s/multivm/virtio-balloon/gib_min}{11709.871031956354}
+\drefset{clang-s/multivm/virtio-balloon/gib_max}{40.89155960083008}
+\drefset{clang-s/multivm/virtio-balloon/vm_gib_max}{14.18880844116211}
 \drefset{clang-s/multivm/HyperAlloc/gib_min}{7725.8696021881115}
+\drefset{clang-s/multivm/HyperAlloc/gib_max}{39.82966613769531}
+\drefset{clang-s/multivm/HyperAlloc/vm_gib_max}{13.507575988769531}
