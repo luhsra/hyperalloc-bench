@@ -1,0 +1,12 @@
+/.vscode/
+__pycache__/
+*.pyc
+/venv/
+/.venv/
+*.egg-info/
+
+/resources/
+/*/results/
+/*/latest/**/out*.txt
+/*/latest/**/boot*.txt
+/*/latest/**/*log.txt
