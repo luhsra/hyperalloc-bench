@@ -1,8 +1,10 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
+from collections.abc import Iterable
+import os
+from pathlib import Path
 import shlex
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, Popen
 from time import sleep
-from typing import *
 from abc import ABC, abstractmethod
 from psutil import Process
 import asyncio
@@ -10,7 +12,9 @@ from time import time
 
 from qemu.qmp import QMPClient
 
-from scripts.utils import *
+from scripts.config import BALLOON_CFG
+from scripts.qemu import qemu_vm, qemu_wait_startup
+from scripts.utils import SSHExec, non_block_read, rm_ansi_escape, setup
 
 # Selected Spec benches an their respective memory consumption in MiB (1 copy)
 SPEC_SUITE = {
@@ -66,19 +70,15 @@ STREAM_BENCH = {
 
 class Bench(ABC):
     @abstractmethod
-    def args(self, parser: ArgumentParser):
+    async def setup(self):
         pass
 
     @abstractmethod
-    def setup(self):
+    async def run(self) -> Popen[str]:
         pass
 
     @abstractmethod
-    def run(self) -> Popen[str]:
-        pass
-
-    @abstractmethod
-    def results(self):
+    async def results(self):
         pass
 
 
@@ -93,6 +93,7 @@ class Stream(Bench):
     _handle = Popen[str]
     _results: Path
 
+    @staticmethod
     def args(parser: ArgumentParser):
         parser.add_argument(
             "--stream-bench", choices=list(STREAM_BENCH.keys()), default="copy"
@@ -111,21 +112,21 @@ class Stream(Bench):
         self._cores = args.cores
         self._results = results
 
-    def setup(self):
+    async def setup(self):
         # Build STREAM
         print("Building stream")
         openmp = "-fopenmp"
         if self._threads < 2:
             openmp = ""
 
-        self._ssh.run(
+        await self._ssh.run(
             f"gcc -O2 {openmp} -DSTREAM_ARRAY_SIZE={self._size} -DNTIMES={self._iters} {self._bench} {self._HOME}stream.c -o {self._HOME}stream.elf"
         )
 
         # Clear remaining artifacts of previous runs
-        self._ssh.run(f"rm -rf {self._HOME}*.csv")
+        await self._ssh.run(f"rm -rf {self._HOME}*.csv")
 
-    def run(self) -> Popen[str]:
+    async def run(self) -> Popen[str]:
         # Start STREAM and wait for some time to start shrinking the vm
         print("Starting STREAM")
         # Start assigning CPUs from 3 upwards, only use the lower two if needed
@@ -136,9 +137,9 @@ class Stream(Bench):
             f'cd {self._HOME}; export GOMP_CPU_AFFINITY="{taskset}"; export OMP_NUM_THREADS={self._threads}; ./stream.elf'
         )
 
-    def results(self):
+    async def results(self):
         # Collect results
-        self._ssh.download(Path(self._HOME) / "*.csv", str(self._results))
+        await self._ssh.download(Path(self._HOME) / "*.csv", self._results)
 
 
 class FTQ(Bench):
@@ -146,10 +147,11 @@ class FTQ(Bench):
     _iters: int
     _threads: int
     _sampling_interval: int
-    _HOME: str = "/home/debian/ftqV110/ftq/"
+    _HOME: str = "/home/debian/ftq/ftq/"
     _handle = Popen[str]
     _results: Path
 
+    @staticmethod
     def args(parser: ArgumentParser):
         parser.add_argument("--ftq-interval", default=28, type=int)
 
@@ -165,19 +167,19 @@ class FTQ(Bench):
         self._cores = args.cores
         self._results = results
 
-    def setup(self):
+    async def setup(self):
         # Build the matching version of FTQ
         # Threaded FTQ does not accept `-t 1` -.-
         print("Building FTQ")
         if self._threads < 2:
-            self._ssh.run(f"cd {self._HOME}; make ftq")
+            await self._ssh.run(f"cd {self._HOME}; make ftq")
         else:
-            self._ssh.run(f"cd {self._HOME}; make t_ftq")
+            await self._ssh.run(f"cd {self._HOME}; make t_ftq")
 
         # Clear remaining artifacts of previous runs
-        self._ssh.run(f"rm -rf {self._HOME}*.dat")
+        await self._ssh.run(f"rm -rf {self._HOME}*.dat")
 
-    def run(self) -> Popen[str]:
+    async def run(self) -> Popen[str]:
         print("Starting FTQ")
         if self._threads < 2:
             return self._ssh.background(
@@ -188,8 +190,8 @@ class FTQ(Bench):
                 f"cd {self._HOME}; ./t_ftq -t {self._threads} -n {self._iters} -i {self._sampling_interval}"
             )
 
-    def results(self):
-        self._ssh.download(Path(self._HOME) / "*.dat", str(self._results))
+    async def results(self):
+        await self._ssh.download(Path(self._HOME) / "*.dat", self._results)
 
 
 def build_taskset(cpus: Iterable[int]) -> int:
@@ -200,7 +202,7 @@ def build_taskset(cpus: Iterable[int]) -> int:
     return set
 
 
-def gen_spec(ssh: SSHExec, root: Path, max_mem: int, time_per_bench: float):
+async def gen_spec(ssh: SSHExec, root: Path, max_mem: int, time_per_bench: float):
     """
     Generates a scipt that runs the spec suite given a max memory consumption [GiB] and a time per bench [s]
 
@@ -224,9 +226,9 @@ def gen_spec(ssh: SSHExec, root: Path, max_mem: int, time_per_bench: float):
         script += "sleep 10s\n"
     s_path = root / "run_spec.sh"
     s_path.write_text(script)
-    ssh.upload(s_path, "~")
+    await ssh.upload(s_path, "~")
     # Clear the run directories after each run as they are MASSIVE
-    ssh.run("rm -Rf ~/cpu2017/benchspec/C*/*/run")
+    await ssh.run("rm -Rf ~/cpu2017/benchspec/C*/*/run")
 
 
 async def main():
@@ -268,6 +270,7 @@ async def main():
         res_dir.mkdir(exist_ok=True)
 
         print(f"----------Running with {bench_threads}/{args.cores}----------")
+        qemu = None
         try:
             print("Starting qemu...")
             min_mem = args.mem - args.max_balloon
@@ -295,21 +298,21 @@ async def main():
             (res_dir / "cmd.sh").write_text(shlex.join(qemu.args))
             ssh = SSHExec(args.user, port=args.port)
             if args.spec:
-                gen_spec(ssh, root, args.workload_mem, args.workload_time)
+                await gen_spec(ssh, root, args.workload_mem, args.workload_time)
 
             bench: Bench = (
                 FTQ(ssh, args, res_dir, bench_threads)
                 if args.ftq
                 else Stream(ssh, args, res_dir, bench_threads)
             )
-            bench.setup()
+            await bench.setup()
 
             # Consume memory to blow up the vm
             if args.spec:
-                ssh.run("bash run_spec.sh")
+                await ssh.run("bash run_spec.sh")
             else:
                 print("Allocating")
-                ssh.run(f"./write -m {args.workload_mem} -t {args.cores}")
+                await ssh.run(f"./write -m {args.workload_mem} -t {args.cores}")
 
             print(await qmp.execute("query-memory-devices"))
             print(await qmp.execute("x-query-numa"))
@@ -318,7 +321,7 @@ async def main():
             sleep(5)
 
             # Start bench and wait for some time to start shrinking the vm
-            bench_handle = bench.run()
+            bench_handle = await bench.run()
             bench_start_time = time()
             sleep(args.post_delay)
             if not args.baseline:
@@ -338,12 +341,12 @@ async def main():
             print(f"Bench exited with {bench_handle.returncode}.")
 
             # Collect results
-            bench.results()
+            await bench.results()
 
             # Cleanup
             print("Terminating...")
             await qmp.disconnect()
-            ssh.run("sudo shutdown 0")
+            await ssh.run("sudo shutdown 0")
             sleep(15)
         except Exception as e:
             print(e)
@@ -354,10 +357,11 @@ async def main():
                     if e.stderr:
                         f.write(e.stderr)
 
-            (res_dir / "error.txt").write_text(
-                rm_ansi_escape(non_block_read(qemu.stdout))
-            )
-            qemu.terminate()
+            if qemu:
+                (res_dir / "error.txt").write_text(
+                    rm_ansi_escape(non_block_read(qemu.stdout))
+                )
+                qemu.terminate()
             raise e
 
 

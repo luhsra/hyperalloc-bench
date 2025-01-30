@@ -1,49 +1,26 @@
-from argparse import Action, ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace
 from asyncio import sleep
 import asyncio
-from collections.abc import Sequence
 import json
 from pathlib import Path
 import shlex
 from time import time
 from subprocess import CalledProcessError, Popen, check_call
-from typing import Any
 from qemu.qmp import QMPClient
 
 from psutil import Process
 
+from scripts.config import BALLOON_CFG, ModeAction
 from scripts.measure import Measure
+from scripts.qemu import qemu_vm, qemu_wait_startup
 from scripts.vm_resize import VMResize
 from scripts.utils import (
-    BALLOON_CFG,
     SSHExec,
     non_block_read,
-    qemu_vm,
-    qemu_wait_startup,
     rm_ansi_escape,
     setup,
     timestamp,
 )
-
-
-DEFAULTS = {
-    "base": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
-    },
-    "virtio": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
-    },
-    "huge": {
-        "qemu": "/opt/ballooning/virtio-huge-qemu-system",
-        "kernel": "/opt/ballooning/buddy-huge-bzImage",
-    },
-    "llfree": {
-        "qemu": "/opt/ballooning/llfree-qemu-system",
-        "kernel": "/opt/ballooning/llfree-bzImage",
-    },
-}
 
 TARGET = {
     "linux": {
@@ -61,41 +38,6 @@ TARGET = {
         "build": "./write -t`nproc` -m8",
     },
 }
-
-
-class ModeAction(Action):
-    def __init__(
-        self,
-        option_strings: Sequence[str],
-        dest: str,
-        nargs: int | str | None = None,
-        **kwargs,
-    ) -> None:
-        assert nargs is None, "nargs not allowed"
-        super().__init__(option_strings, dest, nargs, **kwargs)
-
-    def __call__(
-        self,
-        parser: ArgumentParser,
-        namespace: Namespace,
-        values: str | Sequence[Any] | None,
-        option_string: str | None = None,
-    ) -> None:
-        assert isinstance(values, str)
-        assert (
-            values in BALLOON_CFG.keys()
-        ), f"mode has to be on of {list(BALLOON_CFG.keys())}"
-
-        kind = values.split("-")[0]
-        assert kind in DEFAULTS
-
-        if namespace.qemu is None:
-            namespace.qemu = DEFAULTS[kind]["qemu"]
-        if namespace.kernel is None:
-            namespace.kernel = DEFAULTS[kind]["kernel"]
-        if namespace.suffix is None:
-            namespace.suffix = values
-        setattr(namespace, self.dest, values)
 
 
 class SystemdSlice:

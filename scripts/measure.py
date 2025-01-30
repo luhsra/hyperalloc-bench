@@ -6,7 +6,6 @@ from math import nan
 from pathlib import Path
 from subprocess import CalledProcessError, Popen
 from time import time
-from typing import IO, Any
 from psutil import Process
 
 from .vm_resize import VMResize

@@ -1,61 +1,23 @@
-from argparse import ArgumentParser, Action, Namespace
+from argparse import ArgumentParser
 import asyncio
 import shlex
 from subprocess import CalledProcessError
-from time import sleep
-from typing import Any
-from collections.abc import Sequence
+from asyncio import sleep
 import csv
 
-from scripts.vm_resize import VMResize
-from scripts.utils import *
 from psutil import Process
 from qemu.qmp import QMPClient
 
-
-DEFAULTS = {
-    "base": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
-    },
-    "huge": {
-        "qemu": "/opt/ballooning/virtio-huge-qemu-system",
-        "kernel": "/opt/ballooning/buddy-huge-bzImage",
-    },
-    "virtio-mem": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
-    },
-    "llfree": {
-        "qemu": "/opt/ballooning/llfree-qemu-system",
-        "kernel": "/opt/ballooning/llfree-bzImage",
-    },
-}
-
-class ModeAction(Action):
-    def __init__(self, option_strings: Sequence[str], dest: str,
-                 nargs: int | str | None = None, **kwargs) -> None:
-        assert nargs is None, "nargs not allowed"
-        super().__init__(option_strings, dest, nargs, **kwargs)
-
-    def __call__(self, parser: ArgumentParser, namespace: Namespace,
-                 values: str | Sequence[Any] | None,
-                 option_string: str | None = None) -> None:
-        assert isinstance(values, str)
-        assert values in BALLOON_CFG.keys(), f"mode has to be on of {list(BALLOON_CFG.keys())}"
-
-        kind = values.rsplit("-", maxsplit=1)[0]
-        assert kind in DEFAULTS
-
-        if namespace.qemu is None: namespace.qemu = DEFAULTS[kind]["qemu"]
-        if namespace.kernel is None: namespace.kernel = DEFAULTS[kind]["kernel"]
-        if namespace.suffix is None: namespace.suffix = values
-        setattr(namespace, self.dest, values)
+from scripts.config import BALLOON_CFG, ModeAction
+from scripts.qemu import qemu_vm, qemu_wait_startup
+from scripts.vm_resize import VMResize
+from scripts.utils import *
 
 
 async def main():
     parser = ArgumentParser(
-        description="Inflate and deflate the balloon, measuring the latency")
+        description="Inflate and deflate the balloon, measuring the latency"
+    )
     parser.add_argument("--qemu")
     parser.add_argument("--kernel")
     parser.add_argument("--user", default="debian")
@@ -67,8 +29,9 @@ async def main():
     parser.add_argument("-i", "--iter", type=int, default=1)
     parser.add_argument("--shrink-target", type=int, default=2)
     parser.add_argument("--delay", type=int, default=10)
-    parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()),
-                        required=True, action=ModeAction)
+    parser.add_argument(
+        "--mode", choices=list(BALLOON_CFG.keys()), required=True, action=ModeAction
+    )
     parser.add_argument("--nofault", action="store_true")
     parser.add_argument("--module")
     parser.add_argument("--vfio", type=int)
@@ -79,13 +42,22 @@ async def main():
     print("Running")
 
     qemu = None
+    qmp = None
     try:
         print("start qemu...")
         # make it a little smaller to have some headroom
         min_mem = args.shrink_target
         extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, args.mem)
-        qemu = qemu_vm(args.qemu, args.port, args.kernel, args.cores, hda=args.img,
-                       qmp_port=args.qmp, extra_args=extra_args, vfio_group=args.vfio)
+        qemu = qemu_vm(
+            args.qemu,
+            args.port,
+            args.kernel,
+            args.cores,
+            hda=args.img,
+            qmp_port=args.qmp,
+            extra_args=extra_args,
+            vfio_group=args.vfio,
+        )
         ps_proc = Process(qemu.pid)
 
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
@@ -129,7 +101,12 @@ async def main():
                 await sleep(1)
             await sleep(args.delay)
 
-            print("RSS:", fmt_bytes(ps_proc.memory_info().rss), "target:", fmt_bytes(target_bytes))
+            print(
+                "RSS:",
+                fmt_bytes(ps_proc.memory_info().rss),
+                "target:",
+                fmt_bytes(target_bytes),
+            )
 
             # Grow / Deflate
             await resize.set(max_bytes)
@@ -143,9 +120,15 @@ async def main():
             if not args.nofault and args.module:
                 allocs = int(args.mem - 1) * 1024**3 // 4096
                 await ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
-                touch = parse_module_output(await ssh.output("sudo cat /proc/alloc/out")) * allocs
+                touch = (
+                    parse_module_output(await ssh.output("sudo cat /proc/alloc/out"))
+                    * allocs
+                )
                 await ssh.run(f"echo bulk 1 {allocs} 0 1 0 | sudo tee /proc/alloc/run")
-                touch2 = parse_module_output(await ssh.output("sudo cat /proc/alloc/out")) * allocs
+                touch2 = (
+                    parse_module_output(await ssh.output("sudo cat /proc/alloc/out"))
+                    * allocs
+                )
 
             output = rm_ansi_escape(non_block_read(qemu.stdout))
             logfile.write(output)
@@ -162,11 +145,16 @@ async def main():
         if qemu:
             errfile.write(rm_ansi_escape(non_block_read(qemu.stdout)))
         if isinstance(e, CalledProcessError):
-            if e.stdout: errfile.write(e.stdout)
-            if e.stderr: errfile.write(e.stderr)
+            if e.stdout:
+                errfile.write(e.stdout)
+            if e.stderr:
+                errfile.write(e.stderr)
     finally:
         print("terminate...")
-        if qemu: qemu.terminate()
+        if qmp:
+            await qmp.disconnect()
+        if qemu:
+            qemu.terminate()
         await sleep(3)
 
 
@@ -181,18 +169,27 @@ def parse_write_output(output: str) -> int:
     return int(next(reader)["aavg"])
 
 
-def parse_output(output: str, mode: str) -> tuple[int,int]:
+def parse_output(output: str, mode: str) -> tuple[int, int]:
     match mode:
         case "base-manual" | "huge-manual":
-            return parse_output_with(output, " virtio_balloon_start ", " virtio_balloon_end ")
+            return parse_output_with(
+                output, " virtio_balloon_start ", " virtio_balloon_end "
+            )
         case "llfree-manual":
-            return parse_output_with(output, " llfree_balloon_start ", " llfree_balloon_end ")
+            return parse_output_with(
+                output, " llfree_balloon_start ", " llfree_balloon_end "
+            )
         case "virtio-mem-kernel" | "virtio-mem-movable":
-            return parse_output_with(output, " virtio_mem_config at ", " virtio_mem_end ")
-        case _: assert False, "Invalid Mode"
+            return parse_output_with(
+                output, " virtio_mem_config at ", " virtio_mem_end "
+            )
+        case _:
+            assert False, "Invalid Mode"
 
 
-def parse_output_with(output: str, start_marker: str, end_marker: str) -> tuple[int,int]:
+def parse_output_with(
+    output: str, start_marker: str, end_marker: str
+) -> tuple[int, int]:
     start = []
     end = []
     for line in output.splitlines():

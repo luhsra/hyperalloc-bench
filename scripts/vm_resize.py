@@ -1,4 +1,4 @@
-from qemu.qmp import QMPClient, ExecInterruptedError
+from qemu.qmp import QMPClient
 from .utils import fmt_bytes
 
 

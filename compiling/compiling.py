@@ -1,47 +1,25 @@
-from argparse import ArgumentParser, Action, Namespace
+from argparse import ArgumentParser
 import asyncio
 import json
 import shlex
 from subprocess import CalledProcessError, Popen
-from collections.abc import Sequence
 from asyncio import sleep
-from typing import Any
 from psutil import Process
 import signal
 
 from qemu.qmp import QMPClient
 
+from scripts.config import BALLOON_CFG, ModeAction
 from scripts.measure import Measure
+from scripts.qemu import qemu_vm, qemu_wait_startup
 from scripts.utils import (
-    BALLOON_CFG,
     SSHExec,
     non_block_read,
-    qemu_vm,
-    qemu_wait_startup,
     rm_ansi_escape,
     setup,
 )
 from scripts.vm_resize import VMResize
 
-
-DEFAULTS = {
-    "base": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
-    },
-    "virtio": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
-    },
-    "huge": {
-        "qemu": "/opt/ballooning/virtio-huge-qemu-system",
-        "kernel": "/opt/ballooning/buddy-huge-bzImage",
-    },
-    "llfree": {
-        "qemu": "/opt/ballooning/llfree-qemu-system",
-        "kernel": "/opt/ballooning/llfree-bzImage",
-    },
-}
 
 TARGET = {
     "linux": {
@@ -59,41 +37,6 @@ TARGET = {
         "build": "./write -t`nproc` -m8",
     },
 }
-
-
-class ModeAction(Action):
-    def __init__(
-        self,
-        option_strings: Sequence[str],
-        dest: str,
-        nargs: int | str | None = None,
-        **kwargs,
-    ) -> None:
-        assert nargs is None, "nargs not allowed"
-        super().__init__(option_strings, dest, nargs, **kwargs)
-
-    def __call__(
-        self,
-        parser: ArgumentParser,
-        namespace: Namespace,
-        values: str | Sequence[Any] | None,
-        option_string: str | None = None,
-    ) -> None:
-        assert isinstance(values, str)
-        assert (
-            values in BALLOON_CFG.keys()
-        ), f"mode has to be on of {list(BALLOON_CFG.keys())}"
-
-        kind = values.split("-")[0]
-        assert kind in DEFAULTS
-
-        if namespace.qemu is None:
-            namespace.qemu = DEFAULTS[kind]["qemu"]
-        if namespace.kernel is None:
-            namespace.kernel = DEFAULTS[kind]["kernel"]
-        if namespace.suffix is None:
-            namespace.suffix = values
-        setattr(namespace, self.dest, values)
 
 
 async def main():
@@ -197,6 +140,7 @@ async def main():
                 await ssh.run(TARGET[args.target]["clean"])
 
             # Start profiling
+            perf = None
             if args.perf:
                 perf_file = open(root / f"{i}_perfstats.json", "w+")
                 # The filter for the kvm_exit event ensures that perf only counts exits that are ept violations
@@ -235,7 +179,7 @@ async def main():
             t_total, t_user, t_system = measure.times()
 
             # Signal perf to dump it's trace
-            if args.perf:
+            if perf:
                 perf.send_signal(signal.SIGINT)
 
             # Clean
@@ -265,7 +209,7 @@ async def main():
                 )
             )
 
-            if args.perf:
+            if perf:
                 # Make sure perf finished writing the profile
                 while perf.poll() is None:
                     await sleep(1)

@@ -1,16 +1,13 @@
 import asyncio
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 import fcntl
 import json
 import os
 import re
-import psutil
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
-from itertools import chain
 from pathlib import Path
-from subprocess import CalledProcessError, Popen, PIPE, STDOUT, check_call, check_output
-from asyncio import sleep
+from subprocess import CalledProcessError, Popen, PIPE, STDOUT, check_output
 from typing import IO, Any
 
 import pandas as pd
@@ -80,196 +77,6 @@ def fmt_bytes(bytes: int) -> str:
     return f"{bytes} B"
 
 
-BALLOON_CFG: dict[str, Callable[[int, int, int, int], list[str]]] = {
-    "base-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
-        cores, mem, False
-    ),
-    "base-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
-        cores, mem, True
-    ),
-    "huge-manual": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
-        cores, mem, False
-    ),
-    "huge-auto": lambda cores, mem, _min_mem, _init_mem: qemu_virtio_balloon_args(
-        cores, mem, True
-    ),
-    "llfree-manual": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(
-        cores, mem, False
-    ),
-    "llfree-auto": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(
-        cores, mem, True
-    ),
-    "virtio-mem-kernel": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(
-        mem, min_mem, init_mem, True
-    ),
-    "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(
-        mem, min_mem, init_mem, False
-    ),
-}
-
-
-def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
-    per_core_iothreads = [f"iothread{c}" for c in range(cores)]
-    auto_mode_iothread = "auto-mode-iothread"
-    device = {
-        "driver": "virtio-llfree-balloon",
-        "auto-mode": auto,
-        "ioctl": False,
-        "auto-mode-iothread": auto_mode_iothread,
-        "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
-    }
-    return [
-        "-m",
-        f"{mem}G",
-        "-object",
-        f"iothread,id={auto_mode_iothread}",
-        *chain(*[["-object", f"iothread,id={t}"] for t in per_core_iothreads]),
-        "-device",
-        json.dumps(device),
-    ]
-
-
-def vfio_args(iommu_group: int | None) -> list[str]:
-    if iommu_group is None:
-        return []
-    assert (
-        Path("/dev/vfio") / str(iommu_group)
-    ).exists(), "IOMMU Group is not bound to VFIO!"
-    path = Path("/sys/kernel/iommu_groups") / str(iommu_group) / "devices"
-    return list(
-        chain(
-            *[
-                ["-device", json.dumps({"driver": "vfio-pci", "host": d.name})]
-                for d in path.iterdir()
-            ]
-        )
-    )
-
-
-def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
-    return [
-        "-m",
-        f"{mem}G",
-        "-device",
-        json.dumps({"driver": "virtio-balloon", "free-page-reporting": auto}),
-    ]
-
-
-def qemu_virtio_mem_args(
-    mem: int, min_mem: int, init_mem: int, kernel: bool
-) -> list[str]:
-    default_state = "online_kernel" if kernel else "online_movable"
-    vmem_size = round(mem - min_mem)
-    req_size = round(init_mem - min_mem)
-    return [
-        # fmt: off
-        "-m", f"{min_mem}G,maxmem={mem}G",
-        "-append", f"memhp_default_state={default_state}",
-        "-machine", "pc",
-        "-object", f"memory-backend-ram,id=vmem0,size={vmem_size}G,prealloc=off,reserve=off",
-        "-device", f"virtio-mem-pci,id=vm0,memdev=vmem0,node=0,requested-size={req_size}G,prealloc=off"
-    ]
-
-
-def qemu_vm(
-    qemu: str | Path = "qemu-system-x86_64",
-    port: int = 5022,
-    kernel: str = "bzImage",
-    cores: int = 8,
-    sockets: int = 1,
-    hda: str = "resources/hda.qcow2",
-    kvm: bool = True,
-    qmp_port: int = 5023,
-    extra_args: list[str] | None = None,
-    env: dict[str, str] | None = None,
-    vfio_group: int | None = None,
-    slice: str | None = None,
-    core_start: int = 0,
-) -> Popen[str]:
-    """Start a vm with the given configuration."""
-    assert cores > 0 and cores % sockets == 0
-    assert cores <= psutil.cpu_count()
-    assert Path(hda).exists()
-
-    assert sockets == 1, "not supported"
-
-    if not extra_args:
-        extra_args = []
-
-    base_args = [
-        # fmt: off
-        qemu,
-        #"-m", f"{mem}G",
-        "-smp", f"{cores}",
-        "-hda", hda,
-        "-snapshot",
-        "-serial", "mon:stdio",
-        "-nographic",
-        "-kernel", kernel,
-        "-append", "root=/dev/sda3 console=ttyS0 nokaslr",
-        "-qmp", f"tcp:localhost:{qmp_port},server=on,wait=off",
-        "-nic", f"user,hostfwd=tcp:127.0.0.1:{port}-:22",
-        "-no-reboot",
-        "--cpu", "host",
-        *extra_args,
-        *vfio_args(vfio_group),
-    ]
-
-    if slice:
-        base_args = ["systemd-run", "--user", "--slice", slice, "--scope", *base_args]
-
-    # Combine `-append`
-    args = []
-    cmdline = []
-    is_append = False
-    for arg in base_args:
-        if is_append:
-            cmdline.append(arg)
-        elif arg != "-append":
-            args.append(arg)
-        is_append = arg == "-append"
-    args += ["-append", " ".join(cmdline)]
-
-    if kvm:
-        args.append("-enable-kvm")
-
-    process = Popen(args, stdout=PIPE, stderr=STDOUT, text=True, env=env)
-
-    # Pin qemu to a cpuset on one numa node with one core per vcpu
-    logical = psutil.cpu_count(logical=True)
-    physical = psutil.cpu_count(logical=False)
-    step = 1
-    if logical > physical:
-        print("\033[31mWARNING: SMT detected!\033[0m")
-        step = 2
-    assert cores <= physical, "Not enough cores"
-
-    cpu_set = [x * step for x in range(core_start, core_start + cores)]
-
-    q = psutil.Process(process.pid)
-    q.cpu_affinity(cpu_set)
-
-    return process
-
-
-async def qemu_wait_startup(qemu: Popen[str], logfile: Path):
-    count = 0
-    while True:
-        await sleep(3)
-        assert qemu.poll() is None
-        text = non_block_read(s) if (s := qemu.stdout) else ""
-        if len(text) == 0:
-            # no changes in the past seconds
-            # we either finished or paniced
-            if count > 2:
-                break
-            count += 1
-        else:
-            count = 0
-        with logfile.open("a+") as f:
-            f.write(rm_ansi_escape(text))
-
-
 class SSHExec:
     """Executing shell commands over ssh."""
 
@@ -311,7 +118,9 @@ class SSHExec:
             )
             stdout, _ = await process.communicate()
             if process.returncode != 0:
-                raise CalledProcessError(process.returncode, ssh_args, stdout.decode(errors="replace"))
+                raise CalledProcessError(
+                    process.returncode, ssh_args, stdout.decode(errors="replace")
+                )
             return stdout.decode(errors="replace")
 
     async def process(
