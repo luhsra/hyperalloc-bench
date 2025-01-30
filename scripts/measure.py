@@ -87,13 +87,8 @@ class Measure:
                     except asyncio.TimeoutError:
                         pass
 
-        # Call the callback and wait at most 1s (resize can be slow)
         if self.callback is not None:
-            if self._callback_task is None:
-                self._callback_task = asyncio.create_task(self.callback(small, huge))
-            done, _ = await asyncio.wait({self._callback_task}, timeout=1)
-            if self._callback_task in done:
-                self._callback_task = None
+            await self.callback(small, huge)
 
     async def vm_stats(self) -> tuple[float, float, float, float]:
         try:
