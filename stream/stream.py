@@ -4,17 +4,17 @@ import os
 from pathlib import Path
 import shlex
 from subprocess import CalledProcessError, Popen
-from time import sleep
+from asyncio import sleep
 from abc import ABC, abstractmethod
-from psutil import Process
 import asyncio
 from time import time
 
 from qemu.qmp import QMPClient
 
-from scripts.config import BALLOON_CFG
+from scripts.config import BALLOON_CFG, ModeAction
 from scripts.qemu import qemu_vm, qemu_wait_startup
 from scripts.utils import SSHExec, non_block_read, rm_ansi_escape, setup
+from scripts.vm_resize import VMResize
 
 # Selected Spec benches an their respective memory consumption in MiB (1 copy)
 SPEC_SUITE = {
@@ -27,37 +27,6 @@ SPEC_SUITE = {
     "527.cam4_r": 861,  # ?
     "549.fotonik3d_r": 848,
     "554.roms_r": 842,
-}
-
-SET_BALLOON = {
-    "base-manual": lambda target_size, qmp: qmp.execute(
-        "balloon", {"value": target_size * 1024 * 1024 * 1024}
-    ),
-    "huge-manual": lambda target_size, qmp: qmp.execute(
-        "balloon", {"value": target_size * 1024 * 1024 * 1024}
-    ),
-    "llfree-manual": lambda target_size, qmp: qmp.execute(
-        "llfree-balloon", {"value": target_size * 1024 * 1024 * 1024}
-    ),
-    "llfree-manual-map": lambda target_size, qmp: qmp.execute(
-        "llfree-balloon", {"value": target_size * 1024 * 1024 * 1024}
-    ),
-    "virtio-mem-kernel": lambda target_size, qmp: qmp.execute(
-        "qom-set",
-        {
-            "path": "vm0",
-            "property": "requested-size",
-            "value": target_size * 1024 * 1024 * 1024,
-        },
-    ),
-    "virtio-mem-movable": lambda target_size, qmp: qmp.execute(
-        "qom-set",
-        {
-            "path": "vm0",
-            "property": "requested-size",
-            "value": target_size * 1024 * 1024 * 1024,
-        },
-    ),
 }
 
 STREAM_BENCH = {
@@ -235,15 +204,17 @@ async def main():
     parser = ArgumentParser(
         description="Running the stream benchmark while shrinking the vm after a memory-intensive workload"
     )
-    parser.add_argument("--qemu", default="qemu-system-x86_64")
-    parser.add_argument("--kernel", required=True)
+    parser.add_argument("--qemu")
+    parser.add_argument("--kernel")
     parser.add_argument("--user", default="debian")
     parser.add_argument("--img", default="/opt/ballooning/debian.img")
     parser.add_argument("--port", default=5222, type=int)
     parser.add_argument("--qmp", default=5023, type=int)
     parser.add_argument("-m", "--mem", default=20, type=int)
     parser.add_argument("-c", "--cores", type=int, default=12)
-    parser.add_argument("--mode", choices=list(BALLOON_CFG.keys()), required=True)
+    parser.add_argument(
+        "--mode", choices=[*BALLOON_CFG.keys()], required=True, action=ModeAction
+    )
     parser.add_argument("--spec", action="store_true")
     parser.add_argument("--bench-iters", type=int, default=400)  # per core
     parser.add_argument("--bench-threads", type=int, nargs="+")
@@ -251,9 +222,7 @@ async def main():
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--workload-mem", type=int, default=19)
     parser.add_argument("--workload-time", type=int, default=180)  # only for spec
-    parser.add_argument("--initial-balloon", type=int, default=0)
     parser.add_argument("--max-balloon", type=int, default=20)
-    parser.add_argument("--shrink-target", type=int, default=2)
     parser.add_argument("--post-delay", default=20, type=int)
     parser.add_argument("--deflate-delay", default=90, type=int)
     parser.add_argument(
@@ -272,9 +241,9 @@ async def main():
         print(f"----------Running with {bench_threads}/{args.cores}----------")
         qemu = None
         try:
-            print("Starting qemu...")
             min_mem = args.mem - args.max_balloon
-            init_mem = args.mem - args.initial_balloon
+            print(f"Starting qemu: mem={min_mem}..{args.mem}")
+            extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, args.mem)
             qemu = qemu_vm(
                 args.qemu,
                 args.port,
@@ -282,17 +251,17 @@ async def main():
                 args.cores,
                 hda=args.img,
                 qmp_port=args.qmp,
-                extra_args=BALLOON_CFG[args.mode](
-                    args.cores, args.mem, min_mem, init_mem
-                ),
-                env={**os.environ, "QEMU_LLFREE_LOG": str(res_dir / "llfree_log.txt")},
+                extra_args=extra_args,
                 vfio_group=args.vfio,
             )
             await qemu_wait_startup(qemu, root / "boot.txt")
-            ps_proc = Process(qemu.pid)
 
             qmp = QMPClient("STREAM machine")
             await qmp.connect(("127.0.0.1", args.qmp))
+
+            min_bytes = min_mem * 1024**3
+            max_bytes = args.mem * 1024**3
+            vm_resize = VMResize(qmp, args.mode, max_bytes, min_bytes, max_bytes)
 
             print("Started")
             (res_dir / "cmd.sh").write_text(shlex.join(qemu.args))
@@ -318,26 +287,26 @@ async def main():
             print(await qmp.execute("x-query-numa"))
 
             # Chill a bit before running bench
-            sleep(5)
+            await sleep(5)
 
             # Start bench and wait for some time to start shrinking the vm
             bench_handle = await bench.run()
             bench_start_time = time()
-            sleep(args.post_delay)
+            await sleep(args.post_delay)
             if not args.baseline:
-                res = await SET_BALLOON[args.mode](args.shrink_target, qmp)
-                print(f"Balloon returned {res}")
+                print("Inflating balloon")
+                await vm_resize.set(min_bytes)
 
                 # Deflate balloon again
-                sleep(args.deflate_delay - (time() - bench_start_time))
+                await sleep(args.deflate_delay - (time() - bench_start_time))
                 if bench_handle.poll() is not None:
                     print("Warning: Bench was done before deflation started")
-                await SET_BALLOON[args.mode](18, qmp)
                 print("Deflating balloon again")
+                await vm_resize.set(max_bytes)
 
             # Wait for bench to be done
             while bench_handle.poll() is None:
-                sleep(1)
+                await sleep(1)
             print(f"Bench exited with {bench_handle.returncode}.")
 
             # Collect results
@@ -346,8 +315,8 @@ async def main():
             # Cleanup
             print("Terminating...")
             await qmp.disconnect()
-            await ssh.run("sudo shutdown 0")
-            sleep(15)
+            qemu.terminate()
+            await sleep(15)
         except Exception as e:
             print(e)
             if isinstance(e, CalledProcessError):

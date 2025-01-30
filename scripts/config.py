@@ -48,8 +48,8 @@ class ModeAction(Action):
             values in BALLOON_CFG.keys()
         ), f"mode has to be on of {list(BALLOON_CFG.keys())}"
 
-        kind = values.split("-")[0]
-        assert kind in DEFAULTS
+        kind = values.rsplit("-", maxsplit=1)[0]
+        assert kind in DEFAULTS, f"Unknown mode: {kind}"
 
         if namespace.qemu is None:
             namespace.qemu = DEFAULTS[kind]["qemu"]

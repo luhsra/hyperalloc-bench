@@ -125,11 +125,16 @@ async def main():
                     (await ssh.output(f"cat {fpr_path}page_reporting_order")).strip()
                 )
 
-            client = QMPClient("compile vm")
-            await client.connect(("127.0.0.1", args.qmp))
-            vm_resize = VMResize(
-                client, "virtio-mem-movable", args.mem * 1024**3, min_mem * 1024**3
-            )
+            resize_callback = None
+            if args.mode.startswith("virtio-mem-"):
+                client = QMPClient("compile vm")
+                await client.connect(("127.0.0.1", args.qmp))
+                max_bytes = args.mem * 1024**3
+                min_bytes = min_mem * 1024**3
+                vm_resize = VMResize(
+                    client, args.mode, max_bytes, min_bytes, min_bytes, args.vmem_fraction
+                )
+                resize_callback = vm_resize.auto_resize
 
             if qemu.poll() is not None:
                 raise Exception("Qemu crashed")
@@ -154,7 +159,15 @@ async def main():
                     stderr=perf_file,
                 )
 
-            measure = Measure(root, i, ssh, ps_proc, args, vm_resize)
+            measure = Measure(
+                root,
+                i,
+                ssh,
+                ps_proc,
+                args,
+                None,
+                resize_callback,
+            )
 
             await measure()
 

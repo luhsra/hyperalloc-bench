@@ -6,9 +6,9 @@ from math import nan
 from pathlib import Path
 from subprocess import CalledProcessError, Popen
 from time import time
+from typing import Coroutine
 from psutil import Process
 
-from .vm_resize import VMResize
 from .utils import (
     SSHExec,
     free_pages,
@@ -27,14 +27,14 @@ class Measure:
         ssh: SSHExec,
         ps_proc: Process,
         args: Namespace,
-        vm_resize: VMResize | None = None,
         time_start: float | None = None,
+        callback: Callable[[float, float], Coroutine] | None = None,
     ) -> None:
         self.i = i
         self.ssh = ssh
         self.root = root
         self.args = args
-        self.vm_resize = vm_resize
+        self.callback = callback
         self.ps_proc = ps_proc
 
         # A bit of memory is reserved for kernel stuff
@@ -46,13 +46,12 @@ class Measure:
         self._times_user = times.user
         self._times_system = times.system
         self._time = time_start or time()
-        self._vm_stats_task: Task[tuple[int, int, int, int]] | None = None
+        self._vm_stats_task: Task[tuple[float, float, float, float]] | None = None
+        self._callback_task: Task | None = None
 
     async def __call__(
         self, process: Popen[str] | asyncio.subprocess.Process | None = None
     ):
-        sec = self.sec()
-
         if self._reserved_mem == None:
             z = await self.ssh.output("cat /proc/zoneinfo")
             self._reserved_mem = (
@@ -62,11 +61,12 @@ class Measure:
         small, huge, cached, total = nan, nan, nan, nan
         if self._vm_stats_task is None:
             self._vm_stats_task = asyncio.create_task(self.vm_stats())
-        done, _ = await asyncio.wait({self._vm_stats_task}, timeout=0.5)
+        done, _ = await asyncio.wait({self._vm_stats_task}, timeout=1)
         if self._vm_stats_task in done:
             small, huge, cached, total = await self._vm_stats_task
             self._vm_stats_task = None
 
+        sec = self.sec()
         rss = self.ps_proc.memory_info().rss
         with (self.root / f"out_{self.i}.csv").open("a+") as mem_usage:
             mem_usage.write(f"{sec:.2f},{rss},{small},{huge},{cached},{total}\n")
@@ -87,21 +87,15 @@ class Measure:
                     except asyncio.TimeoutError:
                         pass
 
-        # resize vm
-        if self.vm_resize is not None and self.args.mode.startswith("virtio-mem-"):
-            # Follow free huge pages
-            free = int(huge * 2 ** (12 + 9) * 0.9)  # 10% above huge pages
-            # free = small * 2**12 * 0.9 # 10% above small pages
-            # Step size, amount of mem that is plugged/unplugged
-            step = round(self.vm_resize.max * self.args.vmem_fraction)
-            if free < step / 2:  # grow faster
-                await self.vm_resize.set(self.vm_resize.size + 2 * step)
-            elif free < step:
-                await self.vm_resize.set(self.vm_resize.size + step)
-            elif free > 2 * step:
-                await self.vm_resize.set(self.vm_resize.size - step)
+        # Call the callback and wait at most 1s (resize can be slow)
+        if self.callback is not None:
+            if self._callback_task is None:
+                self._callback_task = asyncio.create_task(self.callback(small, huge))
+            done, _ = await asyncio.wait({self._callback_task}, timeout=1)
+            if self._callback_task in done:
+                self._callback_task = None
 
-    async def vm_stats(self) -> tuple[int, int, int, int]:
+    async def vm_stats(self) -> tuple[float, float, float, float]:
         try:
             small, huge = free_pages(await self.ssh.output("cat /proc/buddyinfo"))
             meminfo = parse_meminfo(await self.ssh.output("cat /proc/meminfo"))
@@ -110,7 +104,8 @@ class Measure:
             return small, huge, total, cached
         except CalledProcessError as e:
             print("VM Stats Error:", e)
-            return 0, 0, 0, 0
+            assert self.ps_proc.is_running()
+            return nan, nan, nan, nan
 
     def sec(self) -> float:
         return time() - self._time

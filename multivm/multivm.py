@@ -134,7 +134,6 @@ async def boot_vm(
         print(f"start vm {id}...")
         min_mem = min_memory(args.mem)
         extra_args = BALLOON_CFG[args.mode](args.cores, args.mem, min_mem, min_mem)
-
         qemu = qemu_vm(
             args.qemu,
             args.port + id,
@@ -180,14 +179,16 @@ async def exec_vm(
 ):
     client = None
     try:
-        client = QMPClient("compile vm")
-        await client.connect(("127.0.0.1", args.qmp + id))
-        vm_resize = VMResize(
-            client,
-            "virtio-mem-movable",
-            args.mem * 1024**3,
-            min_memory(args.mem) * 1024**3,
-        )
+        resize_callback = None
+        if args.mode.startswith("virtio-mem-"):
+            client = QMPClient("compile vm")
+            await client.connect(("127.0.0.1", args.qmp + id))
+            min_bytes = min_memory(args.mem) * 1024**3
+            max_bytes = args.mem * 1024**3
+            vm_resize = VMResize(
+                client, args.mode, max_bytes, min_bytes, min_bytes, args.vmem_fraction
+            )
+            resize_callback = vm_resize.auto_resize
 
         if qemu.poll() is not None:
             raise Exception("Qemu crashed")
@@ -195,15 +196,14 @@ async def exec_vm(
         print(f"Exec vm={id} i={i} c={args.cores}")
 
         ssh = SSHExec(args.user, port=args.port + id)
-        ps_proc = Process(qemu.pid)
         measure = Measure(
             root,
             i,
             ssh,
-            ps_proc,
+            Process(qemu.pid),
             args,
-            vm_resize,
             time_start,
+            resize_callback,
         )
         await measure()
 
