@@ -1,6 +1,5 @@
 from argparse import ArgumentParser, Namespace
-from collections.abc import Iterable
-import os
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 import shlex
 from subprocess import CalledProcessError, Popen
@@ -200,7 +199,7 @@ async def gen_spec(ssh: SSHExec, root: Path, max_mem: int, time_per_bench: float
     await ssh.run("rm -Rf ~/cpu2017/benchspec/C*/*/run")
 
 
-async def main():
+async def main(argv: Sequence[str] | None = None):
     parser = ArgumentParser(
         description="Running the stream benchmark while shrinking the vm after a memory-intensive workload"
     )
@@ -208,9 +207,9 @@ async def main():
     parser.add_argument("--kernel")
     parser.add_argument("--user", default="debian")
     parser.add_argument("--img", default="/opt/ballooning/debian.img")
-    parser.add_argument("--port", default=5222, type=int)
-    parser.add_argument("--qmp", default=5023, type=int)
-    parser.add_argument("-m", "--mem", default=20, type=int)
+    parser.add_argument("--port", type=int, default=5222)
+    parser.add_argument("--qmp", type=int, default=5023)
+    parser.add_argument("-m", "--mem", type=int, default=20)
     parser.add_argument("-c", "--cores", type=int, default=12)
     parser.add_argument(
         "--mode", choices=[*BALLOON_CFG.keys()], required=True, action=ModeAction
@@ -223,16 +222,12 @@ async def main():
     parser.add_argument("--workload-mem", type=int, default=19)
     parser.add_argument("--workload-time", type=int, default=180)  # only for spec
     parser.add_argument("--max-balloon", type=int, default=20)
-    parser.add_argument("--post-delay", default=20, type=int)
-    parser.add_argument("--deflate-delay", default=90, type=int)
-    parser.add_argument(
-        "--vfio",
-        type=int,
-        help="IOMMU that shoud be passed into VM. This has to be bound to VFIO first!",
-    )
+    parser.add_argument("--post-delay", type=int, default=20)
+    parser.add_argument("--deflate-delay", type=int, default=90)
+    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
     Stream.args(parser)
     FTQ.args(parser)
-    args, root = setup("stream", parser, custom="vm")
+    args, root = setup(parser, argv)
 
     for bench_threads in args.bench_threads:
         res_dir = root / f"{bench_threads}"

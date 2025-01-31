@@ -23,8 +23,7 @@ def pass_to_vfio(group: Path):
     sleep(1)
 
     # Give us access
-    check_call(["chown", "-R", "root:srastaff", "/dev/vfio"])
-    check_call(["chmod", "-R", "g+rw", "/dev/vfio"])
+    check_call(["chown", "-R", "go+rw", "/dev/vfio"])
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Rebind an IOMMU group to VFIO")

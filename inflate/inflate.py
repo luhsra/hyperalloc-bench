@@ -1,5 +1,7 @@
 from argparse import ArgumentParser
 import asyncio
+from collections.abc import Sequence
+from pathlib import Path
 import shlex
 from subprocess import CalledProcessError
 from asyncio import sleep
@@ -10,11 +12,11 @@ from qemu.qmp import QMPClient
 
 from scripts.config import BALLOON_CFG, ModeAction
 from scripts.qemu import qemu_vm, qemu_wait_startup
+from scripts.utils import SSHExec, fmt_bytes, non_block_read, rm_ansi_escape, setup
 from scripts.vm_resize import VMResize
-from scripts.utils import *
 
 
-async def main():
+async def main(argv: Sequence[str] | None = None):
     parser = ArgumentParser(
         description="Inflate and deflate the balloon, measuring the latency"
     )
@@ -34,12 +36,8 @@ async def main():
     )
     parser.add_argument("--nofault", action="store_true")
     parser.add_argument("--module")
-    parser.add_argument("--vfio", type=int)
-    args, root = setup("inflate", parser, custom="vm")
-
-    ssh = SSHExec(args.user, port=args.port)
-
-    print("Running")
+    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
+    args, root = setup(parser, argv)
 
     qemu = None
     qmp = None
@@ -62,6 +60,7 @@ async def main():
 
         (root / "cmd.sh").write_text(shlex.join(qemu.args))
         await qemu_wait_startup(qemu, root / "boot.txt")
+        ssh = SSHExec(args.user, port=args.port)
 
         if not args.nofault and args.module:
             name = Path(args.module).name

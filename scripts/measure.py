@@ -1,12 +1,11 @@
 from argparse import Namespace
 import asyncio
 from asyncio import Task, sleep
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from math import nan
 from pathlib import Path
 from subprocess import CalledProcessError, Popen
 from time import time
-from typing import Coroutine
 from psutil import Process
 
 from .utils import (

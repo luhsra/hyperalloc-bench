@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 import fcntl
 import json
 import os
@@ -15,7 +15,9 @@ import pandas as pd
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
-def setup(name: str, parser: ArgumentParser, custom=None) -> tuple[Namespace, Path]:
+def setup(
+    parser: ArgumentParser, argv: Sequence[str] | None = None, custom=None
+) -> tuple[Namespace, Path]:
     """
     Setup the benchmark directory and save the system config and execution parameters.
 
@@ -26,7 +28,7 @@ def setup(name: str, parser: ArgumentParser, custom=None) -> tuple[Namespace, Pa
     """
     parser.add_argument("--output", help="Name of the output directory")
     parser.add_argument("--suffix", help="Suffix added to the output directory")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     output = args.output if args.output else timestamp()
     root = Path("results") / (output + (f"-{args.suffix}" if args.suffix else ""))

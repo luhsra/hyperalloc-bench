@@ -1,6 +1,7 @@
 from argparse import ArgumentParser, Namespace
 from asyncio import sleep
 import asyncio
+from collections.abc import Sequence
 import json
 from pathlib import Path
 import shlex
@@ -70,7 +71,7 @@ def min_memory(mem: int) -> int:
     return round(mem / 8)
 
 
-async def main():
+async def main(argv: Sequence[str] | None = None):
     parser = ArgumentParser(
         description="Compiling linux in a vm while monitoring memory usage"
     )
@@ -91,11 +92,11 @@ async def main():
         "--mode", choices=[*BALLOON_CFG.keys()], required=True, action=ModeAction
     )
     parser.add_argument("--target", choices=list(TARGET.keys()), required=True)
-    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough.")
+    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
     parser.add_argument("--vmem-fraction", type=float, default=1 / 16)
     parser.add_argument("--vms", type=int, default=1)
     parser.add_argument("--high-mem", type=int)
-    args, root = setup("multivm", parser, custom="vm")
+    args, root = setup(parser, argv)
 
     mem = args.mem * args.vms
     with SystemdSlice(

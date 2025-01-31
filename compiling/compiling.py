@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 import asyncio
+from collections.abc import Sequence
 import json
 import shlex
 from subprocess import CalledProcessError, Popen
@@ -39,7 +40,7 @@ TARGET = {
 }
 
 
-async def main():
+async def main(argv: Sequence[str] | None = None):
     parser = ArgumentParser(
         description="Compiling linux in a vm while monitoring memory usage"
     )
@@ -60,21 +61,14 @@ async def main():
         "--mode", choices=list(BALLOON_CFG.keys()), required=True, action=ModeAction
     )
     parser.add_argument("--target", choices=list(TARGET.keys()), required=True)
-    parser.add_argument(
-        "--vfio",
-        type=int,
-        help="IOMMU that should be passed into VM. This has to be bound to VFIO first!",
-    )
+    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
     parser.add_argument("--vmem-fraction", type=float, default=1 / 16)
     parser.add_argument("--fpr-delay", type=int, help="Delay between reports in ms")
     parser.add_argument("--fpr-capacity", type=int, help="Size of the fpr buffer")
     parser.add_argument("--fpr-order", type=int, help="Report granularity")
-    args, root = setup("compiling", parser, custom="vm")
-
-    ssh = SSHExec(args.user, port=args.port)
+    args, root = setup(parser, argv)
 
     print("Running")
-    i = 0
 
     qemu = None
     client = None
@@ -108,6 +102,7 @@ async def main():
                 (root / "cmd.sh").write_text(shlex.join(qemu.args))
 
             await qemu_wait_startup(qemu, root / f"boot_{i}.txt")
+            ssh = SSHExec(args.user, port=args.port)
 
             # Check for the FPR configuration
             fpr_path = "/sys/module/page_reporting/parameters/"
@@ -132,7 +127,12 @@ async def main():
                 max_bytes = args.mem * 1024**3
                 min_bytes = min_mem * 1024**3
                 vm_resize = VMResize(
-                    client, args.mode, max_bytes, min_bytes, min_bytes, args.vmem_fraction
+                    client,
+                    args.mode,
+                    max_bytes,
+                    min_bytes,
+                    min_bytes,
+                    args.vmem_fraction,
                 )
                 resize_callback = vm_resize.auto_resize
 
@@ -233,7 +233,7 @@ async def main():
     except Exception as e:
         (root / "exception.txt").write_text(str(e))
         if isinstance(e, CalledProcessError):
-            with (root / f"error_{i}.txt").open("w+") as f:
+            with (root / f"error.txt").open("w+") as f:
                 if e.stdout:
                     f.write(e.stdout)
                 if e.stderr:
