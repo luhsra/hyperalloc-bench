@@ -8,6 +8,20 @@ HyperAlloc: Efficient VM Memory De/Inflation via Hypervisor-Shared Page-Frame Al
 Lars Wrenger, Kenny Albes, Marco Wurps, Christian Dietrich, Daniel Lohmann
 In: Proceedings of the 20th European Conference on Computer Systems (EuroSys 2025); ACM
 
+## Artifact Evaluation
+
+The artifact evaluation instructions are in [artifact-eval/](artifact-eval/).
+
+## Related Repositories
+
+- [hyperalloc-linux](https://github.com/luhsra/hyperalloc-linux): Modified Linux kernel
+- [hyperalloc-qemu](https://github.com/luhsra/hyperalloc-qemu): Modified QEMU monitor
+- [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench): Kernel module for benchmarking the page allocator
+- [hyperalloc-stream](https://github.com/luhsra/hyperalloc-stream): STREAM memory bandwidth benchmark
+- [hyperalloc-ftq](https://github.com/luhsra/hyperalloc-ftq): FTQ CPU work benchmark
+- [llfree-c](https://github.com/luhsra/llfree-c): C-based implementation of the LLFree page allocator
+- [llfree-rs](https://github.com/luhsra/llfree-rs): Rust-based implementation of the LLFree page allocator, including some micro benchmarks, like [write.rs](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs)
+
 ## Benchmark Data & Visualization
 
 The benchmarks have been developed and tested on Linux 6.1 (Debian 12) for host and guest, and QEMU 8.2.50.
@@ -32,7 +46,7 @@ The benchmark `mode` can be one of the following:
 - `base-manual`: Unmodified QEMU and guest with manual virtio-balloon
 - `base-auto`: Unmodified QEMU and guest with enabled free-page-reporting
 - `huge-manual`: Modified QEMU and guest which use huge pages instead of base pages for ballooning
-- `virtio-mem-movable`: Unmodified QEMU and guest with enabled virtio-mem, that adds movable memory
+- `virtio-mem`: Unmodified QEMU and guest with enabled virtio-mem, that adds movable memory
 - `llfree-manual`: Modified QEMU and guest with integrated LLFree and manual reclamation.
 - `llfree-auto`: Modified QEMU and guest with integrated LLFree and auto reclamation.
 

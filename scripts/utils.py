@@ -22,16 +22,25 @@ def setup(
     Setup the benchmark directory and save the system config and execution parameters.
 
     Args:
-        name: Name of the benchmark
         parser: CLI Arguments to be parsed and saved
+        argv: Arguments to be parsed
         custom: Any custom metadata that should be saved
     """
-    parser.add_argument("--output", help="Name of the output directory")
-    parser.add_argument("--suffix", help="Suffix added to the output directory")
+    parser.add_argument(
+        "--no-timestamp",
+        action="store_true",
+        help="Should the output directory be prefixed with a timestamp",
+    )
+    parser.add_argument(
+        "--suffix", default="unknown", help="Suffix added to the output directory"
+    )
+    parser.add_argument(
+        "--root", default="results", help="Root directory for the results"
+    )
     args = parser.parse_args(argv)
 
-    output = args.output if args.output else timestamp()
-    root = Path("results") / (output + (f"-{args.suffix}" if args.suffix else ""))
+    prefix = "" if args.no_timestamp else f"{timestamp()}-"
+    root = Path(args.root) / (prefix + args.suffix)
     root.mkdir(parents=True, exist_ok=True)
     with (root / "meta.json").open("w+") as f:
         values = {

@@ -178,7 +178,7 @@ def parse_output(output: str, mode: str) -> tuple[int, int]:
             return parse_output_with(
                 output, " llfree_balloon_start ", " llfree_balloon_end "
             )
-        case "virtio-mem-kernel" | "virtio-mem-movable":
+        case "virtio-mem":
             return parse_output_with(
                 output, " virtio_mem_config at ", " virtio_mem_end "
             )

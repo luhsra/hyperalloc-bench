@@ -48,7 +48,7 @@ class ModeAction(Action):
             values in BALLOON_CFG.keys()
         ), f"mode has to be on of {list(BALLOON_CFG.keys())}"
 
-        kind = values.rsplit("-", maxsplit=1)[0]
+        kind = values.split("-")[0] if values != "virtio-mem" else values
         assert kind in DEFAULTS, f"Unknown mode: {kind}"
 
         if namespace.qemu is None:
@@ -79,11 +79,8 @@ BALLOON_CFG: dict[str, Callable[[int, int, int, int], list[str]]] = {
     "llfree-auto": lambda cores, mem, _min_mem, _init_mem: qemu_llfree_balloon_args(
         cores, mem, True
     ),
-    "virtio-mem-kernel": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(
-        mem, min_mem, init_mem, True
-    ),
-    "virtio-mem-movable": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(
-        mem, min_mem, init_mem, False
+    "virtio-mem": lambda _cores, mem, min_mem, init_mem: qemu_virtio_mem_args(
+        mem, min_mem, init_mem
     ),
 }
 
@@ -118,9 +115,9 @@ def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
 
 
 def qemu_virtio_mem_args(
-    mem: int, min_mem: int, init_mem: int, kernel: bool
+    mem: int, min_mem: int, init_mem: int
 ) -> list[str]:
-    default_state = "online_kernel" if kernel else "online_movable"
+    default_state = "online_movable"
     vmem_size = round(mem - min_mem)
     req_size = round(init_mem - min_mem)
     return [

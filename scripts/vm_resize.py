@@ -34,7 +34,7 @@ class VMResize:
                 await self.qmp.execute("balloon", {"value": self.size})
             case "llfree-manual" | "llfree-manual-map":
                 await self.qmp.execute("llfree-balloon", {"value" : self.size})
-            case "virtio-mem-kernel" | "virtio-mem-movable":
+            case "virtio-mem":
                 await self.qmp.execute("qom-set", {
                     "path": "vm0",
                     "property": "requested-size",
@@ -50,7 +50,7 @@ class VMResize:
             case "llfree-manual" | "llfree-manual-map":
                 res = await self.qmp.execute("query-llfree-balloon")
                 return res["actual"]
-            case "virtio-mem-kernel" | "virtio-mem-movable":
+            case "virtio-mem":
                 res = await self.qmp.execute("qom-get", {"path": "vm0", "property": "size"})
                 return self.min + res
             case _: assert False, "Invalid Mode"
