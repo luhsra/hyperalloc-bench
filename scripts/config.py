@@ -94,7 +94,6 @@ def qemu_llfree_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
     device = {
         "driver": "virtio-llfree-balloon",
         "auto-mode": auto,
-        "ioctl": False,
         "auto-mode-iothread": auto_mode_iothread,
         "iothread-vq-mapping": [{"iothread": t} for t in per_core_iothreads],
     }
