@@ -227,6 +227,7 @@ def stream_plot_fn(bench: Benchmark, config: Config):
         ],
         stream,
         stream_meta,
+        save_as="stream",
         out=root,
     )
 
@@ -254,6 +255,7 @@ def ftq_plot_fn(bench: Benchmark, config: Config):
         ],
         ftq,
         ftq_meta,
+        save_as="ftq",
         out=root,
     )
 

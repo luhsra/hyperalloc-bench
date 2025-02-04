@@ -73,6 +73,7 @@ def load_streams(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     meta = json.load((p / f"{DRIVER_MAP['Baseline']}-stream" / "meta.json").open())
     cores = meta["args"]["bench_threads"]
+    print("loading", len(drivers), "modes for", cores, "cores")
     frames = []
     for c in cores:
         base = load_stream_csv(p, c, "virtio-balloon")
@@ -94,6 +95,7 @@ def visualize_stream(
     save_as: str | None = None,
     out: Path = Path("out"),
 ) -> tuple[sns.FacetGrid, pd.DataFrame]:
+    print("plotting", len(drivers), "modes")
     col_ord = stream_meta["args"]["bench_threads"]
     order = drivers
 
@@ -154,6 +156,7 @@ def visualize_stream(
                 c.set_rasterized(True)
 
     if save_as:
+        print("save to", out / f"{save_as}")
         p.savefig(out / f"{save_as}.pdf", bbox_inches="tight", dpi=100)
         p.savefig(out / f"{save_as}.svg", bbox_inches="tight", dpi=100)
         dref_dataframe(save_as, out, ["Driver", "Cores", "IterTime"], stream)
@@ -188,6 +191,7 @@ def sum_ftqs_batched(path: Path, cores: int, driver: str, samples: int) -> pd.Da
 def load_ftqs(p: Path, drivers: list[str]) -> tuple[pd.DataFrame, dict[str, Any]]:
     meta = json.load((p / f"{DRIVER_MAP['Baseline']}-ftq" / "meta.json").open())
     cores = meta["args"]["bench_threads"]
+    print("loading", len(drivers), "modes for", cores, "cores")
     frames = []
     for c in cores:
         for d in drivers:
@@ -235,6 +239,7 @@ def visualize_ftq(
                 c.set_rasterized(True)
 
     if save_as:
+        print("save to", out / f"{save_as}")
         p.savefig(out / f"{save_as}.pdf", bbox_inches="tight", dpi=100)
         p.savefig(out / f"{save_as}.svg", bbox_inches="tight", dpi=100)
         dref_dataframe(save_as, out, ["Driver", "Cores", "Times"], ftq)
