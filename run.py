@@ -466,7 +466,7 @@ async def main():
     print("bench")
     parser = ArgumentParser(description="Benchmark Runner")
     benchmarks = {benchmark.name: benchmark for benchmark in BENCHMARKS}
-    parser.add_argument("step", choices=["all", "build", "bench", "plot"])
+    parser.add_argument("step", choices=["build", "bench", "plot", "bench-plot"])
     parser.add_argument("-b", "--bench", choices=["all", *benchmarks], default="all")
     parser.add_argument("--vfio", type=int)
     parser.add_argument("--fast", action="store_true")
@@ -481,9 +481,9 @@ async def main():
 
     for benchmark in BENCHMARKS:
         if args.bench == "all" or args.bench == benchmark.name:
-            if args.step in ["all", "bench"]:
+            if args.step in ["bench-plot", "bench"]:
                 await benchmark.run(config)
-            if args.step in ["all", "plot"]:
+            if args.step in ["bench-plot", "plot"]:
                 benchmark.plot(config)
 
 

@@ -10,12 +10,13 @@ Additionally, this artifact also contains the raw data used for the paper's figu
 As the artifact is packaged in a Docker image, the only prerequisites for the evaluation are:
 
 - A Linux-based system (for KVM).
-  - We have tested this on Debian 12 with Linux 6.0, 6.1, and 6.2.
+  - We have tested this on Debian 12 with Linux 6.1 and 6.2.
 - At least 12 physical cores and 32GB RAM (more is better).
   - Lower specifications should work, but the results may be less meaningful.
   - The multi-VM benchmarks require 24 physical cores and 48GB RAM.
 - Hyperthreading and TurboBoost should be disabled for more stable results.
 - A properly installed and running Docker daemon.
+- For the VFIO benchmarks, we also need an IOMMU group that can be passed into a VM.
 
 
 ## Getting Started Instructions
@@ -69,7 +70,7 @@ Start it with the following command:
 cd hyperalloc-bench
 source ./venv/bin/activate
 
-./run.py inflate
+./run.py bench-plot inflate --short
 # (about 15m)
 ```
 
@@ -80,7 +81,8 @@ The results can be found in `~/hyperalloc-bench/artifact-eval/inflate` within th
 The plots are directly contained in this directory.
 The subdirectories contain the raw data and metadata, such as system, environment, and benchmark parameters.
 
-The data from the paper is located in the `<benchmark>/latest` directories and the plots in `<benchmark>/out` (`<benchmark>` can be `compiling`, `inflate`, `multivm`, `stream`).
+The data from the paper is located in the `~/hyperalloc-bench/<benchmark>/latest` directories and the plots in `~/hyperalloc-bench/<benchmark>/out` (`<benchmark>` can be `compiling`, `inflate`, `multivm`, `stream`).
+The `stream` directory also contains the `ftq` data.
 
 
 ## Detailed Instructions
@@ -108,13 +110,12 @@ To speedup the process, the image contains pre-built artifacts.
 However, if desired, they can be rebuilt with the following command:
 
 ```sh
-# cd llfree-bench
+# cd hyperalloc-bench
+# source ./venv/bin/activate
 
-./run.py build all
-# (this builds three Linux kernels and QEMUs and usually about 60m)
+./run.py build
+# (this builds three Linux kernels and QEMUs and usually about 1h)
 ```
-
-> "all" can be replaced with a specific target like "linux-base".
 
 The build artifacts are inside the build directories of `hyperalloc-linux`, `hyperalloc-qemu`, and `linux-alloc-bench`.
 
@@ -132,32 +133,22 @@ These build targets are used for the following benchmark targets:
 They can be executed with:
 
 ```sh
-# cd llfree-bench
+# cd hyperalloc-bench
 # source ./venv/bin/activate
 
-./run.py compiling
+./run.py bench-plot all
 # (about 30m)
 ```
 
-> "all" can be replaced with a specific benchmark like "compiling".
+- "all" can be replaced with a specific benchmark like "compiling".
+- "bench-plot" can be replaced with "bench" or "plot" to only run the benchmarks or redraw the plots.
 
-The results can be found in the `~/llfree-bench/artifact` directory within the docker container and the raw data in the `~/llfree-bench/allocator/artifact-*` (alloc, list), `~/llfree-bench/module/artifact-*` (kernel), and `~/llfree-bench/frag/artifact-*` directories.
+The results can be found in the `~/hyperalloc-bench/artifact-eval/<benchmark>` directory within the docker container.
+The plots are directly contained in this directory.
+The subdirectories contain the raw data and metadata, such as system, environment, and benchmark parameters.
 
-
-### Optional: Redrawing the Plots
-
-To redraw the plots from the previously gathered benchmark data, run:
-
-```sh
-# cd llfree-bench
-# source ./venv/bin/activate
-
-./run.py plot all
-# (about 5m)
-```
-
-This command will regenerate the plots using the existing benchmark data without re-running the benchmarks.
-
+The data from the paper is located in the `~/hyperalloc-bench/<benchmark>/latest` directories and the plots in `~/hyperalloc-bench/<benchmark>/out` (`<benchmark>` can be `compiling`, `inflate`, `multivm`, `stream`).
+The `stream` directory also contains the `ftq` data.
 
 ### Exploring the Artifacts
 
