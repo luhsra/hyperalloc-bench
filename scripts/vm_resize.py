@@ -1,6 +1,10 @@
 import math
+from pathlib import Path
 from qemu.qmp import QMPClient
-from .utils import fmt_bytes
+import sys
+
+sys.path.append(str(Path(__file__).parent.parent))
+from scripts.utils import fmt_bytes
 
 
 HUGEPAGE_SIZE = 2**21

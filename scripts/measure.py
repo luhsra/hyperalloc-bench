@@ -7,8 +7,10 @@ from pathlib import Path
 from subprocess import CalledProcessError, Popen
 from time import time
 from psutil import Process
+import sys
 
-from .utils import (
+sys.path.append(str(Path(__file__).parent.parent))
+from scripts.utils import (
     SSHExec,
     free_pages,
     non_block_read,

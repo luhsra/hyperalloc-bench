@@ -1,8 +1,9 @@
 #!/bin/bash
+set -e
 
 mkdir -p bin
 
-cp -r ../../hyperalloc-qemu/build-virtio/qemu-system-x86_64 bin/virtio-qemu-system
+cp -r ../../hyperalloc-qemu/build-virt/qemu-system-x86_64 bin/virtio-qemu-system
 cp -r ../../hyperalloc-qemu/build-huge/qemu-system-x86_64 bin/virtio-huge-qemu-system
 cp -r ../../hyperalloc-qemu/build/qemu-system-x86_64 bin/llfree-qemu-system
 
@@ -15,8 +16,8 @@ cp -r ../../linux-alloc-bench/build-buddy-huge/alloc.ko bin/build-huge-alloc.ko
 cp -r ../../linux-alloc-bench/build-llfree-vm/alloc.ko bin/build-llfree-alloc.ko
 
 # cp -r ../../llfree-rs/target/release/write bin/write
-cp ../resources/debian.qcow2 .
+cp ../resources/debian.qcow2 bin
 
-docker build -t ghcr.io/luhsra/hyperalloc_ae . $@
+docker build --network=host --build-arg BUILDTIME=$(date +%Y%m%d-%H%M%S) -t ghcr.io/luhsra/hyperalloc_ae . $@
 
 rm -r bin

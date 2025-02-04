@@ -7,9 +7,11 @@ from asyncio import sleep
 from abc import ABC, abstractmethod
 import asyncio
 from time import time
+import sys
 
 from qemu.qmp import QMPClient
 
+sys.path.append(str(Path(__file__).parent.parent))
 from scripts.config import BALLOON_CFG, ModeAction
 from scripts.qemu import qemu_vm, qemu_wait_startup
 from scripts.utils import SSHExec, non_block_read, rm_ansi_escape, setup
@@ -329,4 +331,5 @@ async def main(argv: Sequence[str] | None = None):
             raise e
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

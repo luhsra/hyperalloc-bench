@@ -9,10 +9,12 @@ from pathlib import Path
 import numpy as np
 import json
 from matplotlib import patheffects
-from scripts.utils import dref_dataframe, dump_dref
 import matplotlib
 from scipy import integrate
+import sys
 
+sys.path.append(str(Path(__file__).parent.parent))
+from scripts.utils import dref_dataframe, dump_dref
 
 def init():
     matplotlib.rcParams["pdf.fonttype"] = 42
@@ -265,7 +267,9 @@ def overview(
 
     max_mem = meta["args"]["mem"] * 1024**3
     for name, (cat, path) in paths.items():
-        for i in range(6):
+        mode_meta = json.load((path / "meta.json").open())
+        iter = mode_meta["args"]["iter"]
+        for i in range(iter):
             data, times = load_mode(max_mem, name, path, i)
             if name == "Buddy" or name == "LLFree":
                 data.loc[data["measurement"] == "VM memory", "bytes"] = 16 * 1024**3

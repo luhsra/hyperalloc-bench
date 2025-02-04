@@ -2,13 +2,17 @@ from argparse import ArgumentParser
 import asyncio
 from collections.abc import Sequence
 import json
+from pathlib import Path
 import shlex
 from subprocess import CalledProcessError, Popen
 from asyncio import sleep
 from psutil import Process
 import signal
+import sys
 
 from qemu.qmp import QMPClient
+
+sys.path.append(str(Path(__file__).parent.parent))
 
 from scripts.config import BALLOON_CFG, ModeAction
 from scripts.measure import Measure
@@ -251,4 +255,5 @@ async def main(argv: Sequence[str] | None = None):
 
 
 if __name__ == "__main__":
+    print("compile")
     asyncio.run(main())

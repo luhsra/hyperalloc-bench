@@ -10,3 +10,10 @@ __pycache__/
 /*/latest/**/out*.txt
 /*/latest/**/boot*.txt
 /*/latest/**/*log.txt
+
+/artifact-eval/bin
+/artifact-eval/compiling
+/artifact-eval/inflate
+/artifact-eval/mutlivm
+/artifact-eval/stream
+/artifact-eval/ftq

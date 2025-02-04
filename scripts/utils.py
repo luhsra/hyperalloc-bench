@@ -40,7 +40,14 @@ def setup(
     args = parser.parse_args(argv)
 
     prefix = "" if args.no_timestamp else f"{timestamp()}-"
-    root = Path(args.root) / (prefix + args.suffix)
+    suffix = args.suffix
+    if suffix == "unknown":
+        if "mode" in args and args.mode:
+            suffix = args.mode
+        if "target" in args and args.target:
+            suffix = f"{args.target}-{suffix}"
+
+    root = Path(args.root) / (prefix + suffix)
     root.mkdir(parents=True, exist_ok=True)
     with (root / "meta.json").open("w+") as f:
         values = {

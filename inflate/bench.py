@@ -6,10 +6,12 @@ import shlex
 from subprocess import CalledProcessError
 from asyncio import sleep
 import csv
+import sys
 
 from psutil import Process
 from qemu.qmp import QMPClient
 
+sys.path.append(str(Path(__file__).parent.parent))
 from scripts.config import BALLOON_CFG, ModeAction
 from scripts.qemu import qemu_vm, qemu_wait_startup
 from scripts.utils import SSHExec, fmt_bytes, non_block_read, rm_ansi_escape, setup
@@ -38,6 +40,8 @@ async def main(argv: Sequence[str] | None = None):
     parser.add_argument("--module")
     parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
     args, root = setup(parser, argv)
+
+    assert not (not args.nofault and args.module is None), "Need to specify a module"
 
     qemu = None
     qmp = None

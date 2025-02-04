@@ -52,31 +52,35 @@ ssh -p2222 user@localhost
 
 ### Running the First Benchmark
 
+Our paper contains five general benchmarks:
+- `compiling`: Clang compilation with auto VM inflation
+- `inflate`: Inflation/deflation latency
+- `multivm`: Compiling clang on multiple concurrent VMs
+- `stream`: STREAM memory bandwidth benchmark
+- `ftq`: FTQ CPU work benchmark (also in the `stream` directory)
+
 After connecting to the docker image, you can build and run the benchmarks with the `run.py` script.
 
-The fastest benchmark is the "alloc" benchmark, which tests the allocator in userspace on a memory mapping.
+The fastest benchmark is the `inflate` benchmark, which benchmarks latency of the VM inflation/deflation.
 Start it with the following command:
 
 ```sh
-# within Docker
-cd llfree-bench
+# within the docker image (ssh)
+cd hyperalloc-bench
+source ./venv/bin/activate
 
-./run.py bench alloc -m 32 -c 8
-# (about 5m)
+./run.py inflate
+# (about 15m)
 ```
 
-> `-m` specifies the number of GiB for the benchmark and `-c` the number of cores.
->
-> We recommend disabling hyperthreading for the benchmarks.
+> We recommend disabling hyper-threading and turbo-boost for the benchmarks.
 
 This command executes the benchmarks and generates the corresponding plots.
-The results can be found in `~/llfree-bench/artifact/alloc` within the docker container.
+The results can be found in `~/hyperalloc-bench/artifact-eval/inflate` within the docker container.
+The plots are directly contained in this directory.
+The subdirectories contain the raw data and metadata, such as system, environment, and benchmark parameters.
 
-The raw data from your benchmark run can be found in `~/llfree-bench/allocator/artifact-*`, while the data from the paper is in `~/llfree-bench/allocator/latest-*`.
-The metadata, such as system, environment, and benchmark parameters, can also be found in these directories.
-The paper's plots are located in the `out` directory.
-
-> Note that even though this artifact evaluation does rely heavily on virtualization, the data for the paper was obtained on raw hardware.
+The data from the paper is located in the `<benchmark>/latest` directories and the plots in `<benchmark>/out` (`<benchmark>` can be `compiling`, `inflate`, `multivm`, `stream`).
 
 
 ## Detailed Instructions
@@ -85,46 +89,57 @@ This section contains detailed information on executing all the paper's evaluati
 
 ### Optional: Build the Artifacts
 
-The docker image contains the following build targets.
+The docker image contains the following [Linux](https://github.com/luhsra/hyperalloc-linux) build targets:
+- **linux-base**: Baseline Linux without modifications (used for virtio-balloon and virtio-mem).
+- **linux-huge**: Linux with huge-pages for virtio-balloon-huge
+- **linux-llfree**: Linux with the LLFree allocator and HyperAlloc
 
-- **alloc**: The pure LLFree implementation that can be tested and benchmarked in userspace.
-- **kernel**: The modified Linux kernel, configured and built with and without the LLFree allocator.
-- **module**: The kernel module that benchmarks the Linux page allocator.
+For [QEMU](https://github.com/luhsra/hyperalloc-qemu/) we have matching variants:
+- **qemu-base**: Baseline QEMU without modifications (used for virtio-balloon and virtio-mem).
+- **qemu-huge**: QEMU with huge-pages for virtio-balloon-huge
+- **qemu-llfree**: QEMU with the LLFree allocator and HyperAlloc
 
-To expedite the process, the image contains pre-built artifacts.
+For the [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench/) kernel module we have matching variants:
+- **module-base**: Baseline QEMU without modifications (used for virtio-balloon and virtio-mem).
+- **module-huge**: QEMU with huge-pages for virtio-balloon-huge
+- **module-llfree**: QEMU with the LLFree allocator and HyperAlloc
+
+To speedup the process, the image contains pre-built artifacts.
 However, if desired, they can be rebuilt with the following command:
 
 ```sh
 # cd llfree-bench
 
 ./run.py build all
-# (this builds two Linux kernels and usually takes 30-60m)
+# (this builds three Linux kernels and QEMUs and usually about 60m)
 ```
 
-> "all" can be replaced with a specific target like "alloc", "kernel" and "module".
+> "all" can be replaced with a specific target like "linux-base".
 
-The build artifacts are copied into the `build-(alloc|buddy|llfree)` directories.
+The build artifacts are inside the build directories of `hyperalloc-linux`, `hyperalloc-qemu`, and `linux-alloc-bench`.
 
 
 ### Running the Benchmarks
 
 These build targets are used for the following benchmark targets:
 
-- **alloc**: Execute the *bulk*, *rand*, and *repeat* benchmarks with the LLFree allocator in userspace (needs the *alloc* build target)
-- **list**: Execute the *bulk*, *rand*, and *repeat* benchmarks with the list allocators in userspace (needs the *alloc* build target)
-- **kernel**: Execute the *bulk*, *rand*, and *repeat* benchmarks with the buddy and LLFree allocators within the Kernel in KVM+QEMU (needs the *kernel* and *module* build targets)
-- **frag**: Execute the *frag* benchmark with the buddy and LLFree allocators within the Kernel in KVM+QEMU (needs the *kernel* and *module* build targets)
+- `compiling`: Clang compilation with auto VM inflation
+- `inflate`: Inflation/deflation latency
+- `multivm`: Compiling clang on multiple concurrent VMs
+- `stream`: STREAM memory bandwidth benchmark
+- `ftq`: FTQ CPU work benchmark (also in the `stream` directory)
 
 They can be executed with:
 
 ```sh
 # cd llfree-bench
+# source ./venv/bin/activate
 
-./run.py bench all -m <MEM_IN_G> -c <CORES>
+./run.py compiling
 # (about 30m)
 ```
 
-> "all" can be replaced with a specific target like "alloc", "kernel" and "frag".
+> "all" can be replaced with a specific benchmark like "compiling".
 
 The results can be found in the `~/llfree-bench/artifact` directory within the docker container and the raw data in the `~/llfree-bench/allocator/artifact-*` (alloc, list), `~/llfree-bench/module/artifact-*` (kernel), and `~/llfree-bench/frag/artifact-*` directories.
 
@@ -135,6 +150,7 @@ To redraw the plots from the previously gathered benchmark data, run:
 
 ```sh
 # cd llfree-bench
+# source ./venv/bin/activate
 
 ./run.py plot all
 # (about 5m)

@@ -3,10 +3,11 @@ from itertools import chain
 import json
 from pathlib import Path
 from subprocess import PIPE, STDOUT, Popen
-
 import psutil
+import sys
 
-from .utils import non_block_read, rm_ansi_escape
+sys.path.append(str(Path(__file__).parent.parent))
+from scripts.utils import non_block_read, rm_ansi_escape
 
 
 def qemu_vm(

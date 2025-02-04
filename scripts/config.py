@@ -2,25 +2,33 @@ from argparse import Action, ArgumentParser, Namespace
 from collections.abc import Callable, Sequence
 from itertools import chain
 import json
+from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).parent.parent
 
 DEFAULTS = {
     "base": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
+        "qemu": ROOT.parent / "hyperalloc-qemu/build-virt/qemu-system-x86_64",
+        "kernel": ROOT.parent / "hyperalloc-linux/build-buddy-vm/arch/x86/boot/bzImage",
+        "module": ROOT.parent / "linux-alloc-bench/build-buddy-vm/alloc.ko",
     },
     "huge": {
-        "qemu": "/opt/ballooning/virtio-huge-qemu-system",
-        "kernel": "/opt/ballooning/buddy-huge-bzImage",
+        "qemu": ROOT.parent / "hyperalloc-qemu/build-huge/qemu-system-x86_64",
+        "kernel": ROOT.parent
+        / "hyperalloc-linux/build-buddy-huge/arch/x86/boot/bzImage",
+        "module": ROOT.parent / "linux-alloc-bench/build-buddy-huge/alloc.ko",
     },
     "virtio-mem": {
-        "qemu": "/opt/ballooning/virtio-qemu-system",
-        "kernel": "/opt/ballooning/buddy-bzImage",
+        "qemu": ROOT.parent / "hyperalloc-qemu/build-virt/qemu-system-x86_64",
+        "kernel": ROOT.parent / "hyperalloc-linux/build-buddy-vm/arch/x86/boot/bzImage",
+        "module": ROOT.parent / "linux-alloc-bench/build-buddy-vm/alloc.ko",
     },
     "llfree": {
-        "qemu": "/opt/ballooning/llfree-qemu-system",
-        "kernel": "/opt/ballooning/llfree-bzImage",
+        "qemu": ROOT.parent / "hyperalloc-qemu/build/qemu-system-x86_64",
+        "kernel": ROOT.parent
+        / "hyperalloc-linux/build-llfree-vm/arch/x86/boot/bzImage",
+        "module": ROOT.parent / "linux-alloc-bench/build-llfree-vm/alloc.ko",
     },
 }
 
@@ -52,11 +60,11 @@ class ModeAction(Action):
         assert kind in DEFAULTS, f"Unknown mode: {kind}"
 
         if namespace.qemu is None:
-            namespace.qemu = DEFAULTS[kind]["qemu"]
+            namespace.qemu = str(DEFAULTS[kind]["qemu"])
         if namespace.kernel is None:
-            namespace.kernel = DEFAULTS[kind]["kernel"]
-        if namespace.suffix is None:
-            namespace.suffix = values
+            namespace.kernel = str(DEFAULTS[kind]["kernel"])
+        if "module" in namespace and namespace.module is None:
+            namespace.module = str(DEFAULTS[kind]["module"])
         setattr(namespace, self.dest, values)
 
 
@@ -114,9 +122,7 @@ def qemu_virtio_balloon_args(cores: int, mem: int, auto: bool) -> list[str]:
     ]
 
 
-def qemu_virtio_mem_args(
-    mem: int, min_mem: int, init_mem: int
-) -> list[str]:
+def qemu_virtio_mem_args(mem: int, min_mem: int, init_mem: int) -> list[str]:
     default_state = "online_movable"
     vmem_size = round(mem - min_mem)
     req_size = round(init_mem - min_mem)

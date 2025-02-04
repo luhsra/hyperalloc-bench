@@ -7,10 +7,12 @@ from pathlib import Path
 import shlex
 from time import time
 from subprocess import CalledProcessError, Popen, check_call
-from qemu.qmp import QMPClient
-
+import sys
 from psutil import Process
 
+from qemu.qmp import QMPClient
+
+sys.path.append(str(Path(__file__).parent.parent))
 from scripts.config import BALLOON_CFG, ModeAction
 from scripts.measure import Measure
 from scripts.qemu import qemu_vm, qemu_wait_startup
