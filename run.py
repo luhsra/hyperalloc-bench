@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from argparse import ArgumentParser
 import asyncio
 from collections.abc import Callable, Coroutine, Sequence
@@ -339,20 +341,24 @@ BENCHMARKS = [
         default={"target": "clang", "delay": 7200, "mem": 16},
         fast={"target": "write", "delay": 30, "mem": 10},
         args=[
-            "--target {target}",
+            "--target",
+            "{target}",
             "-m{mem}",
             "-c8",
-            "--delay {delay}",
-            "--repeat 3",
-            "--vms 3",
+            "--delay",
+            "{delay}",
+            "--repeat",
+            "3",
+            "--vms",
+            "3",
         ],
         modes=[
             ("base-manual", []),
-            ("huge-manual", []),
-            ("llfree-manual", []),
+            ("base-auto", []),
+            ("llfree-auto", []),
             ("base-manual", ["--suffix", "{target}-base-manual-s", "--simultaneous"]),
-            ("huge-manual", ["--suffix", "{target}-base-manual-s", "--simultaneous"]),
-            ("llfree-manual", ["--suffix", "{target}-base-manual-s", "--simultaneous"]),
+            ("base-auto", ["--suffix", "{target}-base-auto-s", "--simultaneous"]),
+            ("llfree-auto", ["--suffix", "{target}-llfree-auto-s", "--simultaneous"]),
         ],
         long_modes=[],
         plot=multivm_plot_fn,
@@ -423,20 +429,37 @@ BENCHMARKS = [
 
 async def build():
     parent = Path(__file__).parent.parent
-    def run(cmd, cwd):
-        print(f"\n\x1b[94mRunning: {cmd}\n - CWD={cwd}\x1b[0m")
-        return asyncio.create_subprocess_shell(cmd, cwd=cwd)
 
-    await run("make LLVM=-16 -j`nproc` O=build-buddy-vm", cwd=parent / "hyperalloc-linux")
-    await run("make LLVM=-16 -j`nproc` O=build-buddy-huge", cwd=parent / "hyperalloc-linux")
-    await run("make LLVM=-16 -j`nproc` O=build-llfree-vm", cwd=parent / "hyperalloc-linux")
+    async def run(cmd, cwd):
+        print(f"\n\x1b[94mRunning: {cmd}\n - CWD={cwd}\x1b[0m")
+        process = await asyncio.create_subprocess_shell(cmd, cwd=cwd)
+        ret = await process.wait()
+        assert ret == 0, f"Failed with {ret}"
+
+    await run(
+        "make LLVM=-16 -j`nproc` O=build-buddy-vm", cwd=parent / "hyperalloc-linux"
+    )
+    await run(
+        "make LLVM=-16 -j`nproc` O=build-buddy-huge", cwd=parent / "hyperalloc-linux"
+    )
+    await run(
+        "make LLVM=-16 -j`nproc` O=build-llfree-vm", cwd=parent / "hyperalloc-linux"
+    )
 
     await run("./build.sh", cwd=parent / "linux-alloc-bench")
 
-    await run("../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-trace-backends=simple && ninja", cwd=parent / "hyperalloc-qemu/build-virt")
-    # TODO: integrate into same branch!
-    await run("../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-balloon-huge --enable-trace-backends=simple && ninja", cwd=parent / "hyperalloc-qemu/build-huge")
-    await run("../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-llfree --enable-trace-backends=simple && ninja", cwd=parent / "hyperalloc-qemu/build")
+    await run(
+        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-trace-backends=simple && ninja",
+        cwd=parent / "hyperalloc-qemu/build-virt",
+    )
+    await run(
+        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-balloon-huge --enable-trace-backends=simple && ninja",
+        cwd=parent / "hyperalloc-qemu/build-huge",
+    )
+    await run(
+        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-llfree --enable-trace-backends=simple && ninja",
+        cwd=parent / "hyperalloc-qemu/build",
+    )
 
 
 async def main():
@@ -444,7 +467,7 @@ async def main():
     parser = ArgumentParser(description="Benchmark Runner")
     benchmarks = {benchmark.name: benchmark for benchmark in BENCHMARKS}
     parser.add_argument("step", choices=["all", "build", "bench", "plot"])
-    parser.add_argument("benchmark", choices=["all", *benchmarks])
+    parser.add_argument("-b", "--bench", choices=["all", *benchmarks], default="all")
     parser.add_argument("--vfio", type=int)
     parser.add_argument("--fast", action="store_true")
     parser.add_argument("--long", action="store_true")
@@ -453,10 +476,11 @@ async def main():
 
     config = Config(args.vfio, args.fast, args.long, args.specs)
 
+    if args.step == "build":
+        await build()
+
     for benchmark in BENCHMARKS:
-        if benchmark.name == "all" or benchmark.name in args.benchmark:
-            if args.step in ["all", "build"]:
-                await build()
+        if args.bench == "all" or args.bench == benchmark.name:
             if args.step in ["all", "bench"]:
                 await benchmark.run(config)
             if args.step in ["all", "plot"]:

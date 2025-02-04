@@ -14,6 +14,6 @@ __pycache__/
 /artifact-eval/bin
 /artifact-eval/compiling
 /artifact-eval/inflate
-/artifact-eval/mutlivm
+/artifact-eval/multivm
 /artifact-eval/stream
 /artifact-eval/ftq

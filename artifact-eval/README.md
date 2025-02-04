@@ -174,11 +174,13 @@ This requires `sshfs` to be installed on your system.
 Now, you can explore the `llfree_ae` directory with your file manager.
 The home directory contains the following subdirectories:
 
-- [llfree-bench](https://github.com/luhsra/llfree-bench): Collection of benchmark scripts for LLFree.
-  - `artifact`: Contains the plots of the artifact evaluation.
-  - `allocator`: Contains the "alloc" and "list" results.
-  - `module`: Contains the "kernel" results.
-  - `frag`: Contains the "frag" results.
-- [llfree-rs](https://github.com/luhsra/llfree-rs): The LLFree Rust implementation.
-- [llfree-linux](https://github.com/luhsra/llfree-linux): The modified Linux Kernel that can be configured to use LLFree instead of the Buddy allocator.
+- [hyperalloc-bench](https://github.com/luhsra/hyperalloc-bench): Collection of benchmark scripts for HyperAlloc.
+  - `compiling`: Contains the clang auto reclamation benchmark.
+  - `inflate`: Contains the inflate/deflate latency benchmark.
+  - `multivm`: Contains the multi-VM benchmarks.
+  - `stream`: Contains the STREAM and FTQ benchmarks.
+- [hyperalloc-qemu](https://github.com/luhsra/hyperalloc-qemu): The QEMU with integrated HyperAlloc.
+- [hyperalloc-linux](https://github.com/luhsra/hyperalloc-linux): The Linux Kernel with integrated HyperAlloc.
+- [hyperalloc-stream](https://github.com/luhsra/hyperalloc-stream): The STREAM memory bandwidth benchmark.
+- [hyperalloc-ftq](https://github.com/luhsra/hyperalloc-ftq): The FTQ CPU work benchmark.
 - [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench): Kernel module for benchmarking the page allocator.

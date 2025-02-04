@@ -5,11 +5,12 @@ ENV DEBIAN_FRONTEND="noninteractive"
 # Dependencies
 RUN apt-get -y update ; \
     apt-get -y install apt-utils ; \
-    apt-get -y install dumb-init openssh-server sudo ; \
+    apt-get -y install dumb-init openssh-server sudo iproute2 ; \
     apt-get -y install qemu-system qemu-kvm ; \
     apt-get -y install python3-pip python3-venv ; \
     apt-get -y install build-essential curl git vim htop ; \
     apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf llvm-16 clang-16 bc lld lld-16 ; \
+    apt-get -y install libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev ninja-build ; \
     apt-get clean && apt-get autoclean
 
 # Default user
@@ -26,6 +27,7 @@ RUN su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-bench.g
     su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-linux.git /home/user/hyperalloc-linux" && \
     su user -c "cd /home/user/hyperalloc-linux && sed -i 's/git@github.com:luhsra\\/llfree-c.git/https:\\/\\/github.com\\/luhsra\\/llfree-c.git/g' .gitmodules && git submodule update --init" && \
     su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-qemu.git /home/user/hyperalloc-qemu" && \
+    su user -c "cd /home/user/hyperalloc-qemu && sed -i 's/git@github.com:luhsra\\/llfree-c.git/https:\\/\\/github.com\\/luhsra\\/llfree-c.git/g' .gitmodules && git submodule update --init subprojects/llfree-c/llc" && \
     su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-stream.git /home/user/hyperalloc-stream" && \
     su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-ftq.git /home/user/hyperalloc-ftq" && \
     su user -c "git clone --depth 1 https://github.com/luhsra/linux-alloc-bench.git /home/user/linux-alloc-bench" && \
@@ -53,7 +55,7 @@ COPY --chown=user:root bin/llfree-alloc.ko /home/user/linux-alloc-bench/build-ll
 
 COPY --chown=user:root bin/debian.qcow2 /home/user/hyperalloc-bench/resources/debian.qcow2
 
-EXPOSE 22
+EXPOSE 2222
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/init.sh"]

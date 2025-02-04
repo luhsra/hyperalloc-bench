@@ -11,9 +11,9 @@ cp -r ../../hyperalloc-linux/build-buddy-vm/arch/x86/boot/bzImage bin/buddy-bzIm
 cp -r ../../hyperalloc-linux/build-buddy-huge/arch/x86/boot/bzImage bin/buddy-huge-bzImage
 cp -r ../../hyperalloc-linux/build-llfree-vm/arch/x86/boot/bzImage bin/llfree-bzImage
 
-cp -r ../../linux-alloc-bench/build-buddy-vm/alloc.ko bin/build-buddy-alloc.ko
-cp -r ../../linux-alloc-bench/build-buddy-huge/alloc.ko bin/build-huge-alloc.ko
-cp -r ../../linux-alloc-bench/build-llfree-vm/alloc.ko bin/build-llfree-alloc.ko
+cp -r ../../linux-alloc-bench/build-buddy-vm/alloc.ko bin/buddy-alloc.ko
+cp -r ../../linux-alloc-bench/build-buddy-huge/alloc.ko bin/buddy-huge-alloc.ko
+cp -r ../../linux-alloc-bench/build-llfree-vm/alloc.ko bin/llfree-alloc.ko
 
 # cp -r ../../llfree-rs/target/release/write bin/write
 cp ../resources/debian.qcow2 bin

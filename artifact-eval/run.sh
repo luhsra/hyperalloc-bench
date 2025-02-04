@@ -1,2 +1,2 @@
 #!/bin/bash
-docker run -p 2222:22 --device=/dev/kvm --rm ghcr.io/luhsra/llfree_ae
+docker run --network=host --device=/dev/kvm --rm ghcr.io/luhsra/hyperalloc_ae $@
