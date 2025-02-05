@@ -23,31 +23,6 @@ As the artifact is packaged in a Docker image, the only prerequisites for the ev
 This section aims to help you check the basic functionality of the artifact within a short time frame.
 This includes pulling and starting the Docker image, and running the fastest of our benchmarks.
 
-
-### VFIO and Device Passthrough
-
-There are a few benchmarks that require device passthrough.
-If you do not have a system supporting device passthrough, you can skip this step and the benchmarks by omitting the `--vfio <group>` argument for the `run.py` runner below.
-
-As the device is not directly used (we only measure the general overheads of device passthrough), it does not matter what device it is.
-For our measurements, we passed an Ethernet controller into the VMs.
-
-Generally, you have to bind an IOMMU group from the HOST to VFIO and pass it into the docker container.
-From there it is passed into the respective VMs.
-
-The [bind_vfio.py](/scripts/bind_vfio.py) script can bind IOMMU groups to VFIO (tested on Debian 12, Linux 6.1).
-Executing it (outside the docker container), shows you all IOMMU groups and their corresponding devices.
-You can then enter a group number to bind it to VFIO.
-It should then be visible under `/dev/vfio/<group>`.
-
-> If the script shows you no devices, ensure that the IOMMU on the host is enabled.
-> For Intel systems this might require an additional kernel commandline parameter (`intel_iommu=on`), which you can add to your `/etc/default/grub` `GRUB_CMDLINE_LINUX_DEFAULT` config, for example.
->
-> If this script fails for other reasons, you might have to do this [manually](https://www.kernel.org/doc/html/latest/driver-api/vfio.html#vfio-usage-example) for your respective Linux version.
-
-The next step is to give the docker container access to the `/dev/vfio/<group>` device in the next section.
-
-
 ### Obtaining and Starting the Docker Image
 
 Our Docker image is hosted on GitHub and can be pulled using the commands below.
@@ -62,7 +37,7 @@ docker pull ghcr.io/luhsra/hyperalloc_ae:latest
 We want to use KVM inside the docker container.
 Verify that you have the read/write permissions to `/dev/kvm` or else:
 ```sh
-sudo chown /dev/kvm $USER
+sudo chown $USER /dev/kvm
 ```
 
 Start the image with:
@@ -70,30 +45,76 @@ Start the image with:
 ./run.sh --device /dev/vfio/vfio --device /dev/vfio/<group> --ulimit memlock=53687091200:53687091200
 ```
 
-> The `--device /dev/vfio/vfio --device /dev/vfio/<group> --ulimit memlock=53687091200:53687091200` parameters can be skipped if you do not want to run the VFIO benchmarks.
+> The `--device` and `--ulimit` parameters can be omitted if you want to skip the VFIO benchmarks.
 
 Connect to the image with:
 ```sh
 ssh -p2222 user@localhost
 ```
 
+### Running a Fast Benchmark
+
+After connecting to the container, you can execute a the "inflate" benchmark, which takes about 20min.
+
+```sh
+# (inside the container)
+cd hyperalloc-bench
+source venv/bin/activate
+
+./run.py bench-plot -c inflate --fast
+# (about 20min)
+```
+
+The results of this benchmark (raw data and plots) can be found in `~/hyperalloc-bench/artifact-eval/inflate`.
+You can mount the container's content using sshfs with the [sshfs.sh](artifact-eval/sshfs.sh) script to access them.
+
+```sh
+# (outside the docker container)
+./sshfs.sh
+```
+
+
+## Detailed Instructions
+
+### VFIO and Device Passthrough
+
+There are a few benchmarks that require device passthrough.
+If you do not have a system supporting device passthrough, you can skip this step and the benchmarks by omitting the `--vfio <group>` argument for the `run.py` runner below.
+
+As the device is not directly used (we only measure the general overheads of device passthrough), it does not matter what device it is.
+For our measurements, we passed an Ethernet controller into the VMs.
+
+Generally, you have to bind an IOMMU group from the HOST to VFIO and pass it into the docker container.
+From there it is passed into the respective VMs.
+
+The [/scripts/bind_vfio.py](/scripts/bind_vfio.py) script can bind IOMMU groups to VFIO (tested on Debian 12, Linux 6.1).
+Executing it (outside the docker container), shows you all IOMMU groups and their corresponding devices.
+You can then enter a group number to bind it to VFIO.
+It should then be visible under `/dev/vfio/<group>`.
+
+> If the script shows you no devices, ensure that the IOMMU on the host is enabled.
+> For Intel systems this might require an additional kernel commandline parameter (`intel_iommu=on`), which you can add to your `/etc/default/grub` `GRUB_CMDLINE_LINUX_DEFAULT` config, for example.
+>
+> If this script fails for other reasons, you might have to do this [manually](https://www.kernel.org/doc/html/latest/driver-api/vfio.html#vfio-usage-example) for your respective Linux version.
+
+The next step is to give the docker container access to the `/dev/vfio/<group>` device in the next section.
+
 
 ### Optional: Build the Artifacts
 
-The docker image contains the following [Linux](https://github.com/luhsra/hyperalloc-linux) build targets:
-- **linux-base**: Baseline Linux without modifications (used for virtio-balloon and virtio-mem).
-- **linux-huge**: Linux with huge-pages for virtio-balloon-huge
-- **linux-llfree**: Linux with the LLFree allocator and HyperAlloc
+> The container contains pre-built artifact. So you can skip this step.
 
-For [QEMU](https://github.com/luhsra/hyperalloc-qemu/) we have matching variants:
-- **qemu-base**: Baseline QEMU without modifications (used for virtio-balloon and virtio-mem).
-- **qemu-huge**: QEMU with huge-pages for virtio-balloon-huge
-- **qemu-llfree**: QEMU with the LLFree allocator and HyperAlloc
+The docker image contains the following [Linux](https://github.com/luhsra/hyperalloc-linux) configs:
+- Baseline Linux without modifications (used for virtio-balloon and virtio-mem).
+- Linux with huge-pages for virtio-balloon-huge
+- Linux with the LLFree allocator and HyperAlloc
 
-For the [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench/) kernel module we have matching variants:
-- **module-base**: Baseline QEMU without modifications (used for virtio-balloon and virtio-mem).
-- **module-huge**: QEMU with huge-pages for virtio-balloon-huge
-- **module-llfree**: QEMU with the LLFree allocator and HyperAlloc
+The [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench/) kernel module is also built for the three configs.
+
+For [QEMU](https://github.com/luhsra/hyperalloc-qemu/) we also have:
+- Baseline QEMU without modifications (used for virtio-balloon and virtio-mem).
+- QEMU with huge-pages for virtio-balloon-huge
+- QEMU with the LLFree allocator and HyperAlloc
 
 The following command builds all artifacts:
 
@@ -115,7 +136,7 @@ These build targets are used for the following benchmark targets:
 
 - `compiling`: Clang compilation with auto VM inflation (about 6h and +8h with `--extra`)
 - `inflate`: Inflation/deflation latency (about 30min)
-- `multivm`: Compiling clang on multiple concurrent VMs (about 50h)
+- `multivm`: Compiling clang on multiple concurrent VMs (about 10h)
 - `stream`: STREAM memory bandwidth benchmark (about 30min)
 - `ftq`: FTQ CPU work benchmark (about 30min)
 
