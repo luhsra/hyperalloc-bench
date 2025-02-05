@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import itertools
+import traceback
 from typing import Any
 import sys
 
@@ -520,11 +521,14 @@ async def main():
 
     for benchmark in BENCHMARKS:
         if args.bench == "all" or args.bench == benchmark.name:
-            if args.step in ["bench-plot", "bench"]:
-                await benchmark.run(config)
-            if args.step in ["bench-plot", "plot"]:
-                benchmark.plot(config)
-
+            try:
+                if args.step in ["bench-plot", "bench"]:
+                    await benchmark.run(config)
+                if args.step in ["bench-plot", "plot"]:
+                    benchmark.plot(config)
+            except Exception as e:
+                print(f"\x1b[91mFailed to run {benchmark.name}: {e}\x1b[0m")
+                print(f"\x1b[91m{traceback.format_exc()}\x1b[0m")
 
 if __name__ == "__main__":
     asyncio.run(main())
