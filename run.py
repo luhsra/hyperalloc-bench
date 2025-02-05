@@ -98,6 +98,89 @@ class Benchmark:
         return Path("artifact-eval") / self.name
 
 
+def inflate_plot_fn(bench: Benchmark, config: Config):
+    root = bench.root()
+    vfio = config.vfio is not None
+    inflate_plot.visualize(
+        [
+            root / "base-manual",
+            root / "huge-manual",
+            root / "virtio-mem",
+            *([root / "virtio-mem-vfio"] if vfio else []),
+            root / "llfree-manual",
+            *([root / "llfree-manual-vfio"] if vfio else []),
+        ],
+        [
+            root / "base-manual-nofault",
+            root / "huge-manual-nofault",
+            root / "virtio-mem-nofault",
+            *([root / "virtio-mem-vfio-nofault"] if vfio else []),
+            root / "llfree-manual-nofault",
+            *([root / "llfree-manual-vfio-nofault"] if vfio else []),
+        ],
+        save_as="inflate",
+        out=root,
+    )
+
+
+def stream_plot_fn(bench: Benchmark, config: Config):
+    root = bench.root()
+
+    vfio = config.vfio is not None
+    drivers = [
+        "virtio-balloon",
+        "virtio-balloon-huge",
+        *(["virtio-mem+VFIO"] if vfio else []),
+        "virtio-mem",
+        *(["HyperAlloc+VFIO"] if vfio else []),
+        "HyperAlloc",
+        "Baseline",
+    ]
+
+    stream, stream_meta = stream_plot.load_streams(root, drivers)
+    stream_plot.init()
+    stream_plot.visualize_stream(
+        [
+            "virtio-balloon",
+            "virtio-balloon-huge",
+            "virtio-mem",
+            *(["virtio-mem+VFIO", "HyperAlloc+VFIO"] if vfio else []),
+        ],
+        stream,
+        stream_meta,
+        save_as="stream",
+        out=root,
+    )
+
+
+def ftq_plot_fn(bench: Benchmark, config: Config):
+    root = bench.root()
+    vfio = config.vfio is not None
+    drivers = [
+        "virtio-balloon",
+        "virtio-balloon-huge",
+        *(["virtio-mem+VFIO"] if vfio else []),
+        "virtio-mem",
+        *(["HyperAlloc+VFIO"] if vfio else []),
+        "HyperAlloc",
+        "Baseline",
+    ]
+    ftq, ftq_meta = stream_plot.load_ftqs(root, drivers)
+    stream_plot.init()
+    stream_plot.visualize_ftq(
+        [
+            "virtio-balloon",
+            "virtio-balloon-huge",
+            "virtio-mem",
+            *(["virtio-mem+VFIO", "HyperAlloc+VFIO"] if vfio else []),
+        ],
+        ftq,
+        ftq_meta,
+        save_as="ftq",
+        out=root,
+    )
+
+
 def compiling_plot_fn(bench: Benchmark, config: Config):
     root = bench.root()
     replacements = bench.fast if config.fast else bench.default
@@ -163,31 +246,6 @@ def compiling_plot_fn(bench: Benchmark, config: Config):
     )
 
 
-def inflate_plot_fn(bench: Benchmark, config: Config):
-    root = bench.root()
-    vfio = config.vfio is not None
-    inflate_plot.visualize(
-        [
-            root / "base-manual",
-            root / "huge-manual",
-            root / "virtio-mem",
-            *([root / "virtio-mem-vfio"] if vfio else []),
-            root / "llfree-manual",
-            *([root / "llfree-manual-vfio"] if vfio else []),
-        ],
-        [
-            root / "base-manual-nofault",
-            root / "huge-manual-nofault",
-            root / "virtio-mem-nofault",
-            *([root / "virtio-mem-vfio-nofault"] if vfio else []),
-            root / "llfree-manual-nofault",
-            *([root / "llfree-manual-vfio-nofault"] if vfio else []),
-        ],
-        save_as="inflate",
-        out=root,
-    )
-
-
 def multivm_plot_fn(bench: Benchmark, config: Config):
     root = bench.root()
     replacements = bench.fast if config.fast else bench.default
@@ -212,105 +270,7 @@ def multivm_plot_fn(bench: Benchmark, config: Config):
     )
 
 
-def stream_plot_fn(bench: Benchmark, config: Config):
-    root = bench.root()
-
-    vfio = config.vfio is not None
-    drivers = [
-        "virtio-balloon",
-        "virtio-balloon-huge",
-        *(["virtio-mem+VFIO"] if vfio else []),
-        "virtio-mem",
-        *(["HyperAlloc+VFIO"] if vfio else []),
-        "HyperAlloc",
-        "Baseline",
-    ]
-
-    stream, stream_meta = stream_plot.load_streams(root, drivers)
-    stream_plot.init()
-    stream_plot.visualize_stream(
-        [
-            "virtio-balloon",
-            "virtio-balloon-huge",
-            "virtio-mem",
-            *(["virtio-mem+VFIO", "HyperAlloc+VFIO"] if vfio else []),
-        ],
-        stream,
-        stream_meta,
-        save_as="stream",
-        out=root,
-    )
-
-
-def ftq_plot_fn(bench: Benchmark, config: Config):
-    root = bench.root()
-    vfio = config.vfio is not None
-    drivers = [
-        "virtio-balloon",
-        "virtio-balloon-huge",
-        *(["virtio-mem+VFIO"] if vfio else []),
-        "virtio-mem",
-        *(["HyperAlloc+VFIO"] if vfio else []),
-        "HyperAlloc",
-        "Baseline",
-    ]
-    ftq, ftq_meta = stream_plot.load_ftqs(root, drivers)
-    stream_plot.init()
-    stream_plot.visualize_ftq(
-        [
-            "virtio-balloon",
-            "virtio-balloon-huge",
-            "virtio-mem",
-            *(["virtio-mem+VFIO", "HyperAlloc+VFIO"] if vfio else []),
-        ],
-        ftq,
-        ftq_meta,
-        save_as="ftq",
-        out=root,
-    )
-
-
 BENCHMARKS = [
-    Benchmark(
-        "compiling",
-        compiling.main,
-        default={"target": "clang", "delay": 200, "mem": 16},
-        fast={"target": "write", "delay": 10, "mem": 12},
-        args=["--target", "{target}", "-m{mem}", "-c12", "--delay", "{delay}"],
-        modes=[
-            ("base-manual", []),
-            ("base-auto", []),
-            ("huge-auto", []),
-            ("llfree-manual", []),
-            ("llfree-auto", []),
-            (
-                "llfree-auto",
-                ["--suffix", "{target}-llfree-auto-vfio", "--vfio", "{vfio}"],
-            ),
-            ("virtio-mem", []),
-            (
-                "virtio-mem",
-                ["--suffix", "{target}-virtio-mem-vfio", "--vfio", "{vfio}"],
-            ),
-        ],
-        long_modes=[
-            (
-                "base-auto",
-                [
-                    "--suffix",
-                    f"{{target}}-base-auto-o{o}-d{d}-c{c}",
-                    "--fpr-order",
-                    f"{o}",
-                    "--fpr-delay",
-                    f"{d}",
-                    "--fpr-capacity",
-                    f"{c}",
-                ],
-            )
-            for o, d, c in itertools.product([0, 9], [100, 2000], [32, 512])
-        ],
-        plot=compiling_plot_fn,
-    ),
     Benchmark(
         "inflate",
         inflate.main,
@@ -352,34 +312,6 @@ BENCHMARKS = [
         ],
         long_modes=[],
         plot=inflate_plot_fn,
-    ),
-    Benchmark(
-        "multivm",
-        mutlivm.main,
-        default={"target": "clang", "delay": 7200, "mem": 16},
-        fast={"target": "write", "delay": 30, "mem": 10},
-        args=[
-            "--target",
-            "{target}",
-            "-m{mem}",
-            "-c8",
-            "--delay",
-            "{delay}",
-            "--repeat",
-            "3",
-            "--vms",
-            "3",
-        ],
-        modes=[
-            ("base-manual", []),
-            ("base-auto", []),
-            ("llfree-auto", []),
-            ("base-manual", ["--suffix", "{target}-base-manual-s", "--simultaneous"]),
-            ("base-auto", ["--suffix", "{target}-base-auto-s", "--simultaneous"]),
-            ("llfree-auto", ["--suffix", "{target}-llfree-auto-s", "--simultaneous"]),
-        ],
-        long_modes=[],
-        plot=multivm_plot_fn,
     ),
     Benchmark(
         "stream",
@@ -441,6 +373,74 @@ BENCHMARKS = [
         ],
         long_modes=[],
         plot=ftq_plot_fn,
+    ),
+    Benchmark(
+        "compiling",
+        compiling.main,
+        default={"target": "clang", "delay": 200, "mem": 16},
+        fast={"target": "write", "delay": 10, "mem": 12},
+        args=["--target", "{target}", "-m{mem}", "-c12", "--delay", "{delay}"],
+        modes=[
+            ("base-manual", []),
+            ("base-auto", []),
+            ("huge-auto", []),
+            ("llfree-manual", []),
+            ("llfree-auto", []),
+            (
+                "llfree-auto",
+                ["--suffix", "{target}-llfree-auto-vfio", "--vfio", "{vfio}"],
+            ),
+            ("virtio-mem", []),
+            (
+                "virtio-mem",
+                ["--suffix", "{target}-virtio-mem-vfio", "--vfio", "{vfio}"],
+            ),
+        ],
+        long_modes=[
+            (
+                "base-auto",
+                [
+                    "--suffix",
+                    f"{{target}}-base-auto-o{o}-d{d}-c{c}",
+                    "--fpr-order",
+                    f"{o}",
+                    "--fpr-delay",
+                    f"{d}",
+                    "--fpr-capacity",
+                    f"{c}",
+                ],
+            )
+            for o, d, c in itertools.product([0, 9], [100, 2000], [32, 512])
+        ],
+        plot=compiling_plot_fn,
+    ),
+    Benchmark(
+        "multivm",
+        mutlivm.main,
+        default={"target": "clang", "delay": 7200, "mem": 16},
+        fast={"target": "write", "delay": 30, "mem": 10},
+        args=[
+            "--target",
+            "{target}",
+            "-m{mem}",
+            "-c8",
+            "--delay",
+            "{delay}",
+            "--repeat",
+            "3",
+            "--vms",
+            "3",
+        ],
+        modes=[
+            ("base-manual", []),
+            ("base-auto", []),
+            ("llfree-auto", []),
+            ("base-manual", ["--suffix", "{target}-base-manual-s", "--simultaneous"]),
+            ("base-auto", ["--suffix", "{target}-base-auto-s", "--simultaneous"]),
+            ("llfree-auto", ["--suffix", "{target}-llfree-auto-s", "--simultaneous"]),
+        ],
+        long_modes=[],
+        plot=multivm_plot_fn,
     ),
 ]
 
@@ -529,6 +529,7 @@ async def main():
             except Exception as e:
                 print(f"\x1b[91mFailed to run {benchmark.name}: {e}\x1b[0m")
                 print(f"\x1b[91m{traceback.format_exc()}\x1b[0m")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
