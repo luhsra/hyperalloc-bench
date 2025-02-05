@@ -320,7 +320,7 @@ BENCHMARKS = [
             ("base-manual", []),
             ("huge-manual", []),
             ("llfree-manual", []),
-            ("llfree-manual", ["--suffix", "llfree-auto-vfio", "--vfio", "{vfio}"]),
+            ("llfree-manual", ["--suffix", "llfree-manual-vfio", "--vfio", "{vfio}"]),
             ("virtio-mem", []),
             ("virtio-mem", ["--suffix", "virtio-mem-vfio", "--vfio", "{vfio}"]),
             # nofault
