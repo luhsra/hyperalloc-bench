@@ -101,30 +101,30 @@ async def main(argv: Sequence[str] | None = None):
     args, root = setup(parser, argv)
 
     mem = args.mem * args.vms
-    with SystemdSlice(
-        MemoryMax=f"{mem}G", MemoryHigh=f"{args.high_mem or mem}G"
-    ) as slice:
-        print("Running slice", slice)
+    #with SystemdSlice(
+    #    MemoryMax=f"{mem}G", MemoryHigh=f"{args.high_mem or mem}G"
+    #) as slice:
+    #print("Running slice", slice)
 
-        for i in range(args.iter):
-            vms = []
-            for id in range(args.vms):
+    for i in range(args.iter):
+        vms = []
+        for id in range(args.vms):
+            dir = root / f"vm_{id}"
+            dir.mkdir()
+            vms.append(asyncio.create_task(boot_vm(args, dir, id, "", i)))
+
+        vms = await asyncio.gather(*vms)
+
+        time_start = time()
+
+        times = []
+        async with asyncio.TaskGroup() as group:
+            for id, vm in enumerate(vms):
                 dir = root / f"vm_{id}"
-                dir.mkdir()
-                vms.append(asyncio.create_task(boot_vm(args, dir, id, slice.name, i)))
+                group.create_task(exec_vm(args, dir, id, vm, time_start, i))
+        times.append(time() - time_start)
 
-            vms = await asyncio.gather(*vms)
-
-            time_start = time()
-
-            times = []
-            async with asyncio.TaskGroup() as group:
-                for id, vm in enumerate(vms):
-                    dir = root / f"vm_{id}"
-                    group.create_task(exec_vm(args, dir, id, vm, time_start, i))
-            times.append(time() - time_start)
-
-            (root / f"time_{i}.txt").write_text(json.dumps({"total": times}))
+        (root / f"time_{i}.txt").write_text(json.dumps({"total": times}))
 
 
 async def boot_vm(
@@ -146,7 +146,7 @@ async def boot_vm(
             qmp_port=args.qmp + id,
             extra_args=extra_args,
             vfio_group=args.vfio,
-            slice=slice,
+            #slice=slice,
             core_start=id * args.cores,
         )
         print(f"started {id}")
