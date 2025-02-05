@@ -21,8 +21,10 @@ from stream import bench as stream, plot as stream_plot
 class Config:
     vfio: int | None
     fast: bool
-    long: bool
+    extra: bool
     specs: bool
+    port: int
+    qmp_port: int
 
 
 class Benchmark:
@@ -57,7 +59,15 @@ class Benchmark:
         replacements["vfio"] = config.vfio
 
         print(f"\n\x1b[94mRunning {self.name} bench\x1b[0m")
-        base_args = self.args + ["--root", f"{root}", "--no-timestamp"]
+        base_args = self.args + [
+            "--root",
+            f"{root}",
+            "--no-timestamp",
+            "--port",
+            f"{config.port}",
+            "--qmp",
+            f"{config.qmp_port}",
+        ]
 
         async def run_mode(mode: str, extra_args: list[str]):
             args = base_args + extra_args + ["--mode", mode]
@@ -67,15 +77,13 @@ class Benchmark:
 
             args = [arg.format(**replacements) for arg in args]
             filename = Path(self.function.__code__.co_filename).relative_to(ROOT)
-            print(
-                f"\n\x1b[94mRunning {mode}: {filename} {' '.join(args)}\x1b[0m"
-            )
+            print(f"\n\x1b[94mRunning {mode}: {filename} {' '.join(args)}\x1b[0m")
             await self.function(args)
 
         for mode, extra_args in self.modes:
             await run_mode(mode, extra_args)
 
-        if config.long:
+        if config.extra:
             for mode, extra_args in self.long_modes:
                 await run_mode(mode, extra_args)
 
@@ -121,20 +129,24 @@ def compiling_plot_fn(bench: Benchmark, config: Config):
             out=root,
         )
 
-    long_runs = {}
-    if config.long:
-        long_runs = {
+    extra_runs = {}
+    if config.extra:
+        extra_runs = {
             f"o={o} d={d} c={c}": (
                 "virtio-balloon",
                 root / f"{target}-base-auto-o{o}-d{d}-c{c}",
             )
             for o, d, c in itertools.product([9, 0], [2000, 100], [32, 512])
         }
+    else:
+        extra_runs = {
+            "o=9 d=2000 c=32": ("virtio-balloon", root / f"{target}-base-auto")
+        }
 
     paths = {
         "Buddy": ("baseline", root / f"{target}-base-manual"),
         "LLFree": ("baseline", root / f"{target}-llfree-manual"),
-        **long_runs,
+        **extra_runs,
         "virtio-mem": ("", root / f"{target}-virtio-mem"),
         "virtio-mem+VFIO": ("", root / f"{target}-virtio-mem-vfio"),
         "HyperAlloc": ("", root / f"{target}-llfree-auto"),
@@ -435,8 +447,9 @@ BENCHMARKS = [
 async def build():
     parent = Path(__file__).parent.parent
 
-    async def run(cmd, cwd):
+    async def run(cmd: str, cwd: Path):
         print(f"\n\x1b[94mRunning: {cmd}\n - CWD={cwd}\x1b[0m")
+        cwd.mkdir(parents=True, exist_ok=True)
         process = await asyncio.create_subprocess_shell(cmd, cwd=cwd)
         ret = await process.wait()
         assert ret == 0, f"Failed with {ret}"
@@ -454,15 +467,15 @@ async def build():
     await run("./build.sh", cwd=parent / "linux-alloc-bench")
 
     await run(
-        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-trace-backends=simple && ninja",
+        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp && ninja",
         cwd=parent / "hyperalloc-qemu/build-virt",
     )
     await run(
-        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-balloon-huge --enable-trace-backends=simple && ninja",
+        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-balloon-huge && ninja",
         cwd=parent / "hyperalloc-qemu/build-huge",
     )
     await run(
-        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-llfree --enable-trace-backends=simple && ninja",
+        "CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-llfree && ninja",
         cwd=parent / "hyperalloc-qemu/build",
     )
 
@@ -470,15 +483,37 @@ async def build():
 async def main():
     parser = ArgumentParser(description="Benchmark Runner")
     benchmarks = {benchmark.name: benchmark for benchmark in BENCHMARKS}
-    parser.add_argument("step", choices=["build", "bench", "plot", "bench-plot"])
-    parser.add_argument("-b", "--bench", choices=["all", *benchmarks], default="all")
-    parser.add_argument("--vfio", type=int)
-    parser.add_argument("--fast", action="store_true")
-    parser.add_argument("--long", action="store_true")
-    parser.add_argument("--specs", action="store_true")
+    parser.add_argument(
+        "step", choices=["build", "bench", "plot", "bench-plot"], help="The step to run"
+    )
+    parser.add_argument(
+        "-b",
+        "--bench",
+        choices=["all", *benchmarks],
+        default="all",
+        help="The benchmark to execute or 'all'",
+    )
+    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Use a reduced set of parameters for testing",
+    )
+    parser.add_argument(
+        "--extra",
+        action="store_true",
+        help="Run the additional compile benchmarks that evaluate virtio-balloon's parameters",
+    )
+    parser.add_argument("--specs", help="Path to the specs benchmark suite iso")
+    parser.add_argument("--port", type=int, default=5300, help="SSH port of the VMs")
+    parser.add_argument(
+        "--qmp-port", type=int, default=5400, help="QMP port of the VMs"
+    )
     args = parser.parse_args()
 
-    config = Config(args.vfio, args.fast, args.long, args.specs)
+    config = Config(
+        args.vfio, args.fast, args.extra, args.specs, args.port, args.qmp_port
+    )
 
     if args.step == "build":
         await build()

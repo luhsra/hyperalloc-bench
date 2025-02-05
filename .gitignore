@@ -17,3 +17,4 @@ __pycache__/
 /artifact-eval/multivm
 /artifact-eval/stream
 /artifact-eval/ftq
+/artifact-eval/hyperalloc_ae

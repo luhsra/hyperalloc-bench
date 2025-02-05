@@ -12,7 +12,6 @@ As the artifact is packaged in a Docker image, the only prerequisites for the ev
 - A Linux-based system (for KVM).
   - We have tested this on Debian 12 with Linux 6.1 and 6.2.
 - At least 12 physical cores and 32GB RAM (more is better).
-  - Lower specifications should work, but the results may be less meaningful.
   - The multi-VM benchmarks require 24 physical cores and 48GB RAM.
 - Hyperthreading and TurboBoost should be disabled for more stable results.
 - A properly installed and running Docker daemon.
@@ -28,16 +27,15 @@ This includes pulling and starting the Docker image, and running the fastest of 
 ### VFIO and Device Passthrough
 
 There are a few benchmarks that require device passthrough.
-If you do not have a system supporting device passthrough, you can skip these benchmark by omitting the `--vfio <group>` argument for the `run.py` runner below.
+If you do not have a system supporting device passthrough, you can skip this step and the benchmarks by omitting the `--vfio <group>` argument for the `run.py` runner below.
 
-The [Linux](https://www.kernel.org/doc/html/latest/driver-api/vfio.html) and [QEMU](https://wiki.qemu.org/Features/VT-d) documentations contain a lot of information about VFIO and device passthrough.
 As the device is not directly used (we only measure the general overheads of device passthrough), it does not matter what device it is.
 For our measurements, we passed an Ethernet controller into the VMs.
 
 Generally, you have to bind an IOMMU group from the HOST to VFIO and pass it into the docker container.
 From there it is passed into the respective VMs.
 
-The [bind_vfio.py](/scripts/bind_vfio.py) script can bind IOMMU groups to VFIO (tested on Linux 6.1).
+The [bind_vfio.py](/scripts/bind_vfio.py) script can bind IOMMU groups to VFIO (tested on Debian 12, Linux 6.1).
 Executing it (outside the docker container), shows you all IOMMU groups and their corresponding devices.
 You can then enter a group number to bind it to VFIO.
 It should then be visible under `/dev/vfio/<group>`.
@@ -69,10 +67,10 @@ sudo chown /dev/kvm $USER
 
 Start the image with:
 ```sh
-./run.sh --device /dev/vfio/<group>
+./run.sh --device /dev/vfio/vfio --device /dev/vfio/<group> --ulimit memlock=53687091200:53687091200
 ```
 
-> The `--device /dev/vfio/<group>` can be skipped if you do not want to test the VFIO benchmarks.
+> The `--device /dev/vfio/vfio --device /dev/vfio/<group> --ulimit memlock=53687091200:53687091200` parameters can be skipped if you do not want to run the VFIO benchmarks.
 
 Connect to the image with:
 ```sh
@@ -80,7 +78,7 @@ ssh -p2222 user@localhost
 ```
 
 
-### Build the Artifacts
+### Optional: Build the Artifacts
 
 The docker image contains the following [Linux](https://github.com/luhsra/hyperalloc-linux) build targets:
 - **linux-base**: Baseline Linux without modifications (used for virtio-balloon and virtio-mem).
@@ -100,11 +98,12 @@ For the [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench/) kernel
 The following command builds all artifacts:
 
 ```sh
+# (inside the container)
 # cd hyperalloc-bench
-# source ./venv/bin/activate
+# source venv/bin/activate
 
 ./run.py build
-# (this builds three Linux kernels and QEMUs and usually about 1h)
+# (this builds three Linux kernels and QEMUs and usually takes about 1h)
 ```
 
 The build artifacts are inside the build directories of `hyperalloc-linux`, `hyperalloc-qemu`, and `linux-alloc-bench`.
@@ -114,26 +113,30 @@ The build artifacts are inside the build directories of `hyperalloc-linux`, `hyp
 
 These build targets are used for the following benchmark targets:
 
-- `compiling`: Clang compilation with auto VM inflation
-- `inflate`: Inflation/deflation latency
-- `multivm`: Compiling clang on multiple concurrent VMs
-- `stream`: STREAM memory bandwidth benchmark
-- `ftq`: FTQ CPU work benchmark (also in the `stream` directory)
+- `compiling`: Clang compilation with auto VM inflation (about 6h and +8h with `--extra`)
+- `inflate`: Inflation/deflation latency (about 30min)
+- `multivm`: Compiling clang on multiple concurrent VMs (about 50h)
+- `stream`: STREAM memory bandwidth benchmark (about 30min)
+- `ftq`: FTQ CPU work benchmark (about 30min)
 
 They can be executed with:
 
 ```sh
+# (inside the container)
 # cd hyperalloc-bench
-# source ./venv/bin/activate
+# source venv/bin/activate
 
 ./run.py bench-plot -b all --vfio <group>
-# (about 30m)
+# (sum of all benchmark times)
 ```
 
+> For testing purposes, we would recommend executing the benchmarks with the `--fast` parameter first, which uses the [`write`](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) micro-benchmark instead of the hour-long clang compilation as workloads.
+
+- `bench-plot` can be replaced with `bench` or `plot` to only run the benchmarks or redraw the plots.
+- `all` can be replaced with a specific benchmark like `compiling`.
+- If you want to run the additional `compile` benchmarks that evaluate the virtio-balloon parameters, add the `--extra` argument. This extends the runtime by about 8h.
 - The VFIO `<group>` has to be the one passed into the docker container. You can omit this if you want to skip the VFIO benchmarks.
-- For testing purposes, we would recommend executing the benchmarks with the `--fast` parameter first, which uses the [`write`](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) micro-benchmark instead of the hour-long clang compilation as workloads.
-- "all" can be replaced with a specific benchmark like "compiling".
-- "bench-plot" can be replaced with "bench" or "plot" to only run the benchmarks or redraw the plots.
+
 
 The results can be found in the `~/hyperalloc-bench/artifact-eval/<benchmark>` directory within the docker container.
 The plots are directly contained in this directory.
@@ -152,6 +155,7 @@ This requires `sshfs` to be installed on your system.
 
 ```sh
 # Mount the dockers home directory to your host machine
+# (outside the docker container)
 ./sshfs.sh
 ```
 

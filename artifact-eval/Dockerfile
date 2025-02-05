@@ -19,22 +19,17 @@ RUN useradd -rm -d /home/user -s /bin/bash -g root -G sudo -u 1000 user ; \
     passwd -d user ; \
     mkdir -p /run/sshd ;
 
-ARG BUILDTIME=unknown
 
 # Repositories
-# -b artifact-eval
-RUN su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-bench.git /home/user/hyperalloc-bench" && \
-    su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-linux.git /home/user/hyperalloc-linux" && \
+ARG REPOUPDATE=unknown
+RUN su user -c "git clone --depth 1 -b artifact-eval https://github.com/luhsra/hyperalloc-linux.git /home/user/hyperalloc-linux" && \
     su user -c "cd /home/user/hyperalloc-linux && sed -i 's/git@github.com:luhsra\\/llfree-c.git/https:\\/\\/github.com\\/luhsra\\/llfree-c.git/g' .gitmodules && git submodule update --init" && \
-    su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-qemu.git /home/user/hyperalloc-qemu" && \
+    su user -c "git clone --depth 1 -b artifact-eval https://github.com/luhsra/hyperalloc-qemu.git /home/user/hyperalloc-qemu" && \
     su user -c "cd /home/user/hyperalloc-qemu && sed -i 's/git@github.com:luhsra\\/llfree-c.git/https:\\/\\/github.com\\/luhsra\\/llfree-c.git/g' .gitmodules && git submodule update --init subprojects/llfree-c/llc" && \
-    su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-stream.git /home/user/hyperalloc-stream" && \
-    su user -c "git clone --depth 1 https://github.com/luhsra/hyperalloc-ftq.git /home/user/hyperalloc-ftq" && \
-    su user -c "git clone --depth 1 https://github.com/luhsra/linux-alloc-bench.git /home/user/linux-alloc-bench" && \
+    su user -c "git clone --depth 1 -b artifact-eval https://github.com/luhsra/hyperalloc-stream.git /home/user/hyperalloc-stream" && \
+    su user -c "git clone --depth 1 -b artifact-eval https://github.com/luhsra/hyperalloc-ftq.git /home/user/hyperalloc-ftq" && \
+    su user -c "git clone --depth 1 -b artifact-eval https://github.com/luhsra/linux-alloc-bench.git /home/user/linux-alloc-bench" && \
     echo 1
-
-# Python dependencies
-RUN su user -c "cd /home/user/hyperalloc-bench && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt"
 
 COPY files/halt /bin/
 COPY files/sshd_config /etc/ssh/
@@ -43,11 +38,12 @@ COPY files/init.sh /
 # Prebuild artifacts
 
 ## QEMU
-RUN -su user -c "mkdir /home/user/hyperalloc-qemu/build-virt && cd /home/user/hyperalloc-qemu/build-virt && CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp"
+ENV CC="clang-16"
+RUN su user -c "mkdir /home/user/hyperalloc-qemu/build-virt && cd /home/user/hyperalloc-qemu/build-virt && ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp"
 COPY --chown=user:root bin/virtio-qemu-system /home/user/hyperalloc-qemu/build-virt/qemu-system-x86_64
-RUN -su user -c "mkdir /home/user/hyperalloc-qemu/build-huge && cd /home/user/hyperalloc-qemu/build-huge && CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-virtio-balloon-huge"
+RUN su user -c "mkdir /home/user/hyperalloc-qemu/build-huge && cd /home/user/hyperalloc-qemu/build-huge && ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-balloon-huge"
 COPY --chown=user:root bin/virtio-huge-qemu-system /home/user/hyperalloc-qemu/build-huge/qemu-system-x86_64
-RUN -su user -c "mkdir /home/user/hyperalloc-qemu/build && cd /home/user/hyperalloc-qemu/build && CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-llfree"
+RUN su user -c "mkdir /home/user/hyperalloc-qemu/build && cd /home/user/hyperalloc-qemu/build && ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-llfree"
 COPY --chown=user:root bin/llfree-qemu-system /home/user/hyperalloc-qemu/build/qemu-system-x86_64
 
 ## Linux
@@ -59,6 +55,13 @@ COPY --chown=user:root bin/llfree-bzImage /home/user/hyperalloc-linux/build-llfr
 COPY --chown=user:root bin/buddy-alloc.ko /home/user/linux-alloc-bench/build-buddy-vm/alloc.ko
 COPY --chown=user:root bin/buddy-huge-alloc.ko /home/user/linux-alloc-bench/build-buddy-huge/alloc.ko
 COPY --chown=user:root bin/llfree-alloc.ko /home/user/linux-alloc-bench/build-llfree-vm/alloc.ko
+
+
+ARG BUILDTIME=unknown
+# Benchmarks
+RUN su user -c "git clone --depth 1 -b artifact-eval https://github.com/luhsra/hyperalloc-bench.git /home/user/hyperalloc-bench"
+# Python dependencies
+RUN su user -c "cd /home/user/hyperalloc-bench && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt"
 
 ## Disk Image
 COPY --chown=user:root bin/debian.qcow2 /home/user/hyperalloc-bench/resources/debian.qcow2
