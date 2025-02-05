@@ -12,7 +12,7 @@ from psutil import Process
 from qemu.qmp import QMPClient
 
 sys.path.append(str(Path(__file__).parent.parent))
-from scripts.config import BALLOON_CFG, ModeAction
+from scripts.config import BALLOON_CFG, DEFAULT_DISK, ModeAction
 from scripts.qemu import qemu_vm, qemu_wait_startup
 from scripts.utils import SSHExec, fmt_bytes, non_block_read, rm_ansi_escape, setup
 from scripts.vm_resize import VMResize
@@ -25,7 +25,7 @@ async def main(argv: Sequence[str] | None = None):
     parser.add_argument("--qemu")
     parser.add_argument("--kernel")
     parser.add_argument("--user", default="debian")
-    parser.add_argument("--img", default="/opt/ballooning/debian.img")
+    parser.add_argument("--img", default=str(DEFAULT_DISK))
     parser.add_argument("--port", type=int, default=5222)
     parser.add_argument("--qmp", type=int, default=5023)
     parser.add_argument("-m", "--mem", type=int, default=8)

@@ -41,18 +41,26 @@ COPY files/sshd_config /etc/ssh/
 COPY files/init.sh /
 
 # Prebuild artifacts
+
+## QEMU
+RUN -su user -c "mkdir /home/user/hyperalloc-qemu/build-virt && cd /home/user/hyperalloc-qemu/build-virt && CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp"
 COPY --chown=user:root bin/virtio-qemu-system /home/user/hyperalloc-qemu/build-virt/qemu-system-x86_64
+RUN -su user -c "mkdir /home/user/hyperalloc-qemu/build-huge && cd /home/user/hyperalloc-qemu/build-huge && CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-virtio-balloon-huge"
 COPY --chown=user:root bin/virtio-huge-qemu-system /home/user/hyperalloc-qemu/build-huge/qemu-system-x86_64
+RUN -su user -c "mkdir /home/user/hyperalloc-qemu/build && cd /home/user/hyperalloc-qemu/build && CC=clang-16 ../configure --enable-debug --target-list=x86_64-softmmu --enable-slirp --enable-llfree"
 COPY --chown=user:root bin/llfree-qemu-system /home/user/hyperalloc-qemu/build/qemu-system-x86_64
 
+## Linux
 COPY --chown=user:root bin/buddy-bzImage /home/user/hyperalloc-linux/build-buddy-vm/arch/x86/boot/bzImage
 COPY --chown=user:root bin/buddy-huge-bzImage /home/user/hyperalloc-linux/build-buddy-huge/arch/x86/boot/bzImage
 COPY --chown=user:root bin/llfree-bzImage /home/user/hyperalloc-linux/build-llfree-vm/arch/x86/boot/bzImage
 
+## Kernel Module
 COPY --chown=user:root bin/buddy-alloc.ko /home/user/linux-alloc-bench/build-buddy-vm/alloc.ko
 COPY --chown=user:root bin/buddy-huge-alloc.ko /home/user/linux-alloc-bench/build-buddy-huge/alloc.ko
 COPY --chown=user:root bin/llfree-alloc.ko /home/user/linux-alloc-bench/build-llfree-vm/alloc.ko
 
+## Disk Image
 COPY --chown=user:root bin/debian.qcow2 /home/user/hyperalloc-bench/resources/debian.qcow2
 
 EXPOSE 2222

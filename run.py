@@ -13,6 +13,7 @@ import sys
 from compiling import bench as compiling, plot as compiling_plot
 from inflate import bench as inflate, plot as inflate_plot
 from multivm import bench as mutlivm, plot as multivm_plot
+from scripts.config import ROOT
 from stream import bench as stream, plot as stream_plot
 
 
@@ -58,30 +59,26 @@ class Benchmark:
         print(f"\n\x1b[94mRunning {self.name} bench\x1b[0m")
         base_args = self.args + ["--root", f"{root}", "--no-timestamp"]
 
-        for mode, extra_args in self.modes:
+        async def run_mode(mode: str, extra_args: list[str]):
             args = base_args + extra_args + ["--mode", mode]
             if any([("{vfio}" in arg) for arg in args]) and config.vfio is None:
                 print(f"\n\x1b[94mSkipping {mode} because vfio is not set\x1b[0m")
-                continue
+                return
 
             args = [arg.format(**replacements) for arg in args]
+            filename = Path(self.function.__code__.co_filename).relative_to(ROOT)
             print(
-                f"\n\x1b[94mRunning {mode}: {self.name}/bench.py {' '.join(args)}\x1b[0m"
+                f"\n\x1b[94mRunning {mode}: {filename} {' '.join(args)}\x1b[0m"
             )
             await self.function(args)
 
+        for mode, extra_args in self.modes:
+            await run_mode(mode, extra_args)
+
         if config.long:
             for mode, extra_args in self.long_modes:
-                args = base_args + extra_args
-                if any([("{vfio}" in arg) for arg in args]) and config.vfio is None:
-                    print(f"\n\x1b[94mSkipping {mode} because vfio is not set\x1b[0m")
-                    continue
+                await run_mode(mode, extra_args)
 
-                args = [arg.format(**replacements) for arg in args]
-                print(
-                    f"\n\x1b[94mRunning {mode}: {self.name}/bench.py {' '.join(args)}\x1b[0m"
-                )
-                await self.function(args)
         print(f"\n\x1b[94mFinished {self.name} bench\x1b[0m")
 
     def plot(self, config: Config):
@@ -273,9 +270,15 @@ BENCHMARKS = [
             ("huge-auto", []),
             ("llfree-manual", []),
             ("llfree-auto", []),
-            ("llfree-auto", ["--suffix", "llfree-auto-vfio", "--vfio", "{vfio}"]),
+            (
+                "llfree-auto",
+                ["--suffix", "{target}-llfree-auto-vfio", "--vfio", "{vfio}"],
+            ),
             ("virtio-mem", []),
-            ("virtio-mem", ["--suffix", "virtio-mem-vfio", "--vfio", "{vfio}"]),
+            (
+                "virtio-mem",
+                ["--suffix", "{target}-virtio-mem-vfio", "--vfio", "{vfio}"],
+            ),
         ],
         long_modes=[
             (
@@ -465,7 +468,6 @@ async def build():
 
 
 async def main():
-    print("bench")
     parser = ArgumentParser(description="Benchmark Runner")
     benchmarks = {benchmark.name: benchmark for benchmark in BENCHMARKS}
     parser.add_argument("step", choices=["build", "bench", "plot", "bench-plot"])

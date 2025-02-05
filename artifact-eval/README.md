@@ -24,6 +24,32 @@ As the artifact is packaged in a Docker image, the only prerequisites for the ev
 This section aims to help you check the basic functionality of the artifact within a short time frame.
 This includes pulling and starting the Docker image, and running the fastest of our benchmarks.
 
+
+### VFIO and Device Passthrough
+
+There are a few benchmarks that require device passthrough.
+If you do not have a system supporting device passthrough, you can skip these benchmark by omitting the `--vfio <group>` argument for the `run.py` runner below.
+
+The [Linux](https://www.kernel.org/doc/html/latest/driver-api/vfio.html) and [QEMU](https://wiki.qemu.org/Features/VT-d) documentations contain a lot of information about VFIO and device passthrough.
+As the device is not directly used (we only measure the general overheads of device passthrough), it does not matter what device it is.
+For our measurements, we passed an Ethernet controller into the VMs.
+
+Generally, you have to bind an IOMMU group from the HOST to VFIO and pass it into the docker container.
+From there it is passed into the respective VMs.
+
+The [bind_vfio.py](/scripts/bind_vfio.py) script can bind IOMMU groups to VFIO (tested on Linux 6.1).
+Executing it (outside the docker container), shows you all IOMMU groups and their corresponding devices.
+You can then enter a group number to bind it to VFIO.
+It should then be visible under `/dev/vfio/<group>`.
+
+> If the script shows you no devices, ensure that the IOMMU on the host is enabled.
+> For Intel systems this might require an additional kernel commandline parameter (`intel_iommu=on`), which you can add to your `/etc/default/grub` `GRUB_CMDLINE_LINUX_DEFAULT` config, for example.
+>
+> If this script fails for other reasons, you might have to do this [manually](https://www.kernel.org/doc/html/latest/driver-api/vfio.html#vfio-usage-example) for your respective Linux version.
+
+The next step is to give the docker container access to the `/dev/vfio/<group>` device in the next section.
+
+
 ### Obtaining and Starting the Docker Image
 
 Our Docker image is hosted on GitHub and can be pulled using the commands below.
@@ -43,53 +69,18 @@ sudo chown /dev/kvm $USER
 
 Start the image with:
 ```sh
-./run.sh
+./run.sh --device /dev/vfio/<group>
 ```
+
+> The `--device /dev/vfio/<group>` can be skipped if you do not want to test the VFIO benchmarks.
 
 Connect to the image with:
 ```sh
 ssh -p2222 user@localhost
 ```
 
-### Running the First Benchmark
 
-Our paper contains five general benchmarks:
-- `compiling`: Clang compilation with auto VM inflation
-- `inflate`: Inflation/deflation latency
-- `multivm`: Compiling clang on multiple concurrent VMs
-- `stream`: STREAM memory bandwidth benchmark
-- `ftq`: FTQ CPU work benchmark (also in the `stream` directory)
-
-After connecting to the docker image, you can build and run the benchmarks with the `run.py` script.
-
-The fastest benchmark is the `inflate` benchmark, which benchmarks latency of the VM inflation/deflation.
-Start it with the following command:
-
-```sh
-# within the docker image (ssh)
-cd hyperalloc-bench
-source ./venv/bin/activate
-
-./run.py bench-plot inflate --short
-# (about 15m)
-```
-
-> We recommend disabling hyper-threading and turbo-boost for the benchmarks.
-
-This command executes the benchmarks and generates the corresponding plots.
-The results can be found in `~/hyperalloc-bench/artifact-eval/inflate` within the docker container.
-The plots are directly contained in this directory.
-The subdirectories contain the raw data and metadata, such as system, environment, and benchmark parameters.
-
-The data from the paper is located in the `~/hyperalloc-bench/<benchmark>/latest` directories and the plots in `~/hyperalloc-bench/<benchmark>/out` (`<benchmark>` can be `compiling`, `inflate`, `multivm`, `stream`).
-The `stream` directory also contains the `ftq` data.
-
-
-## Detailed Instructions
-
-This section contains detailed information on executing all the paper's evaluation benchmarks.
-
-### Optional: Build the Artifacts
+### Build the Artifacts
 
 The docker image contains the following [Linux](https://github.com/luhsra/hyperalloc-linux) build targets:
 - **linux-base**: Baseline Linux without modifications (used for virtio-balloon and virtio-mem).
@@ -106,8 +97,7 @@ For the [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench/) kernel
 - **module-huge**: QEMU with huge-pages for virtio-balloon-huge
 - **module-llfree**: QEMU with the LLFree allocator and HyperAlloc
 
-To speedup the process, the image contains pre-built artifacts.
-However, if desired, they can be rebuilt with the following command:
+The following command builds all artifacts:
 
 ```sh
 # cd hyperalloc-bench
@@ -136,10 +126,12 @@ They can be executed with:
 # cd hyperalloc-bench
 # source ./venv/bin/activate
 
-./run.py bench-plot all
+./run.py bench-plot -b all --vfio <group>
 # (about 30m)
 ```
 
+- The VFIO `<group>` has to be the one passed into the docker container. You can omit this if you want to skip the VFIO benchmarks.
+- For testing purposes, we would recommend executing the benchmarks with the `--fast` parameter first, which uses the [`write`](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) micro-benchmark instead of the hour-long clang compilation as workloads.
 - "all" can be replaced with a specific benchmark like "compiling".
 - "bench-plot" can be replaced with "bench" or "plot" to only run the benchmarks or redraw the plots.
 
@@ -150,7 +142,8 @@ The subdirectories contain the raw data and metadata, such as system, environmen
 The data from the paper is located in the `~/hyperalloc-bench/<benchmark>/latest` directories and the plots in `~/hyperalloc-bench/<benchmark>/out` (`<benchmark>` can be `compiling`, `inflate`, `multivm`, `stream`).
 The `stream` directory also contains the `ftq` data.
 
-### Exploring the Artifacts
+
+## Exploring the Artifacts
 
 This section might be helpful if you want to explore the contents of the docker container more easily.
 
@@ -175,3 +168,10 @@ The home directory contains the following subdirectories:
 - [hyperalloc-stream](https://github.com/luhsra/hyperalloc-stream): The STREAM memory bandwidth benchmark.
 - [hyperalloc-ftq](https://github.com/luhsra/hyperalloc-ftq): The FTQ CPU work benchmark.
 - [linux-alloc-bench](https://github.com/luhsra/linux-alloc-bench): Kernel module for benchmarking the page allocator.
+
+
+## Disk Image
+
+The disk image used for the VMs is based on the [debian-12-nocloud-amd64.qcow2](https://www.debian.org/distrib/) cloud image.
+It contains the `hyperalloc-stream`, `hyperalloc-ftq`, and [clang 16.0.0](https://releases.llvm.org/).
+Additionally, it contains the pre-build [write](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) benchmark from the `llfree-rs` repository.

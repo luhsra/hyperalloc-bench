@@ -351,6 +351,7 @@ def overview(
 
     if save_as:
         p.savefig(out / f"{save_as}.pdf", bbox_inches="tight")
+        p.savefig(out / f"{save_as}.svg", bbox_inches="tight")
         dref_dataframe(save_as, out, ["cat", "mode", "variable"], data)
 
     return p, data

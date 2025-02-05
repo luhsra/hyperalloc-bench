@@ -7,6 +7,8 @@ from typing import Any
 
 ROOT = Path(__file__).parent.parent
 
+DEFAULT_DISK = ROOT / "resources/debian.qcow2"
+
 DEFAULTS = {
     "base": {
         "qemu": ROOT.parent / "hyperalloc-qemu/build-virt/qemu-system-x86_64",
