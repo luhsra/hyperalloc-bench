@@ -27,7 +27,7 @@ In the paper, we use the following benchmarks:
 - `ftq` (section 5.4): FTQ CPU work benchmark (about 15min)
 - `compiling` (section 5.5): Clang compilation with auto VM inflation (about 6h and +8h with `--extra`)
 - `blender` (section 5.5): SPEC CPU 2017 blender benchmark (about 40min)
-- `multivm` (section 5.6): Compiling clang on multiple concurrent VMs (about 10h)
+- `multivm` (section 5.6): Compiling clang on multiple concurrent VMs (about 60h)
 
 The `inflate` benchmark measures the latency for shrinking and growing VMs.
 In the paper we claim that HyperAlloc is significantly faster that all other techniques for reclaiming memory (touched and untouched) and returning memory.
@@ -181,9 +181,16 @@ cd hyperalloc-bench
 source venv/bin/activate
 
 ./run.py bench-plot -b all --vfio <device-id>
-# about 18h (sum of all benchmark times)
-# or 26h with --extra
+# all takes about 68h (sum of all benchmark times)
+# or 76h with --extra
 # or 3h with --fast
+
+# inflate: about 20min
+# stream: about 15min
+# ftq: about 15min
+# compiling: about 6h and +8h with --extra
+# blender: about 40min
+# multivm: about 60h
 ```
 
 > For testing purposes, we would recommend executing the benchmarks with the `--fast` parameter first, which uses the [`write`](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) micro-benchmark instead of the hour-long clang compilation as workloads.
