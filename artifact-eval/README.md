@@ -192,6 +192,27 @@ However, the general trends (noticeable reductions in work for virtio-balloon an
 Also, you can increase the runtime with the `--ftq-iters` parameter.
 
 
+### SPEC CPU 2017
+
+The [SPEC benchmark suite](https://www.spec.org/cpu2017/) is not open source, and thus could not be included in this artifact.
+However, you can install it yourself and they have a discount for educational institutions.
+
+We have a single benchmark from this suite in the paper, the `blender` benchmark, in section 5.5.
+If you want to reproduce our results for this benchmark, you have to [install SPEC 2017](https://www.spec.org/cpu2017/Docs/quick-start.html) inside the VM image (inside docker under `~/hyperalloc-bench/resources/debian.qcow2`).
+The `~/hyperalloc-bench/scripts/base.sh` contains the arguments to start a VM to access the disk image.
+
+Then you can execute the benchmark with:
+
+```sh
+# (inside the container)
+cd hyperalloc-bench
+source venv/bin/activate
+
+./run.py bench-plot -b blender
+# (about 40min)
+```
+
+
 ## Exploring the Artifacts
 
 This section might be helpful if you want to explore the contents of the docker container more easily.

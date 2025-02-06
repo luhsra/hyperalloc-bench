@@ -23,7 +23,6 @@ class Config:
     vfio: str | None
     fast: bool
     extra: bool
-    specs: bool
     stream_iters: int
     ftq_iters: int
     port: int
@@ -254,6 +253,19 @@ def compiling_plot_fn(bench: Benchmark, config: Config):
         out=root,
     )
 
+def blender_plot_fn(bench: Benchmark, config: Config):
+    root = bench.root()
+    replacements = bench.fast if config.fast else bench.default
+    target = replacements["target"]
+    compiling_plot.visualize(
+        {
+            "Baseline": root / f"{target}-base-auto",
+            "HyperAlloc": root / f"{target}-llfree-auto",
+        },
+        save_as=f"{target}",
+        out=root,
+    )
+
 
 def multivm_plot_fn(bench: Benchmark, config: Config):
     root = bench.root()
@@ -424,6 +436,19 @@ BENCHMARKS = [
         plot=compiling_plot_fn,
     ),
     Benchmark(
+        "blender",
+        compiling.main,
+        default={"target": "blender", "delay": 240, "mem": 16},
+        fast={"target": "write", "delay": 10, "mem": 12},
+        args=["--target", "{target}", "-m{mem}", "-c12", "--delay", "{delay}", "--repeat", "3"],
+        modes=[
+            ("base-auto", []),
+            ("llfree-auto", []),
+        ],
+        long_modes=[],
+        plot=blender_plot_fn,
+    ),
+    Benchmark(
         "multivm",
         mutlivm.main,
         default={"target": "clang", "delay": 7200, "mem": 16},
@@ -464,15 +489,9 @@ async def build():
         ret = await process.wait()
         assert ret == 0, f"Failed with {ret}"
 
-    await run(
-        "make LLVM=-16 -j`nproc` O=build-buddy-vm", cwd=parent / "hyperalloc-linux"
-    )
-    await run(
-        "make LLVM=-16 -j`nproc` O=build-buddy-huge", cwd=parent / "hyperalloc-linux"
-    )
-    await run(
-        "make LLVM=-16 -j`nproc` O=build-llfree-vm", cwd=parent / "hyperalloc-linux"
-    )
+    await run("make LLVM=-16 -j`nproc` O=build-buddy-vm", cwd=parent / "hyperalloc-linux")
+    await run("make LLVM=-16 -j`nproc` O=build-buddy-huge", cwd=parent / "hyperalloc-linux")
+    await run("make LLVM=-16 -j`nproc` O=build-llfree-vm", cwd=parent / "hyperalloc-linux")
 
     await run("./build.sh", cwd=parent / "linux-alloc-bench")
 
@@ -493,41 +512,23 @@ async def build():
 async def main():
     parser = ArgumentParser(description="Benchmark Runner")
     benchmarks = {benchmark.name: benchmark for benchmark in BENCHMARKS}
-    parser.add_argument(
-        "step", choices=["build", "bench", "plot", "bench-plot"], help="The step to run"
-    )
-    parser.add_argument(
-        "-b",
-        "--bench",
-        choices=["all", *benchmarks],
-        default="all",
-        help="The benchmark to execute or 'all'",
-    )
-    parser.add_argument(
-        "--vfio-dev",
-        help="A device from a bound VFIO group for passthrough"
-    )
-    parser.add_argument(
-        "--fast",
-        action="store_true",
-        help="Use a reduced set of parameters for testing",
-    )
-    parser.add_argument(
-        "--extra",
-        action="store_true",
-        help="Run the additional compile benchmarks that evaluate virtio-balloon's parameters",
-    )
-    parser.add_argument("--specs", help="Path to the specs benchmark suite iso")
+    parser.add_argument("step", choices=["build", "bench", "plot", "bench-plot"],
+                        help="The step to run")
+    parser.add_argument("-b", "--bench", choices=["all", *benchmarks], default="all",
+                        help="The benchmark to execute or 'all'")
+    parser.add_argument("--vfio-dev", help="A device from a bound VFIO group for passthrough")
+    parser.add_argument("--fast", action="store_true",
+                        help="Use a reduced set of parameters for testing")
+    parser.add_argument("--extra", action="store_true",
+        help="Run the additional compile benchmarks that evaluate virtio-balloon's parameters")
     parser.add_argument("--port", type=int, default=5300, help="SSH port of the VMs")
-    parser.add_argument(
-        "--qmp-port", type=int, default=5400, help="QMP port of the VMs"
-    )
+    parser.add_argument("--qmp-port", type=int, default=5400, help="QMP port of the VMs")
     parser.add_argument("--stream-iters", type=int, default=1900, help="Number of stream iterations")
     parser.add_argument("--ftq-iters", type=int, default=1096, help="Number of stream iterations")
     args = parser.parse_args()
 
     config = Config(
-        args.vfio_dev, args.fast, args.extra, args.specs,
+        args.vfio_dev, args.fast, args.extra,
         args.stream_iters, args.ftq_iters,
         args.port, args.qmp_port
     )
@@ -536,7 +537,7 @@ async def main():
         await build()
 
     for benchmark in BENCHMARKS:
-        if args.bench == "all" or args.bench == benchmark.name:
+        if (args.bench == "all" and benchmark.name != "blender") or args.bench == benchmark.name:
             try:
                 if args.step in ["bench-plot", "bench"]:
                     await benchmark.run(config)

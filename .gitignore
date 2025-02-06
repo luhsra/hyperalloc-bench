@@ -12,6 +12,7 @@ __pycache__/
 /*/latest/**/*log.txt
 
 /artifact-eval/bin
+/artifact-eval/blender
 /artifact-eval/compiling
 /artifact-eval/inflate
 /artifact-eval/multivm
