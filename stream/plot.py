@@ -221,16 +221,18 @@ def visualize_ftq(
     p.set(xlabel="Cycles")
     p.set(ylim=(0, None))
     p.set(xlim=(0, ftq["Times"].max()))
-    for ax in p.axes_dict.values():
-        cpu_freq = 2.1e9
-        post_delay = ftq_meta["args"]["post_delay"] * cpu_freq
-        ax.axvline(post_delay, color="red", alpha=0.4, zorder=0.9)
-        ax.text(post_delay + 2 * cpu_freq, ax.viewLim.max[1] * 0.02,
-                "Shrink", color="red", alpha=0.6, size=24)
-        inflate_delay = ftq_meta["args"]["deflate_delay"] * cpu_freq
-        ax.axvline(inflate_delay, color="blue", alpha=0.4, zorder=0.9)
-        ax.text(inflate_delay + 2 * cpu_freq, ax.viewLim.max[1] * 0.02,
-                "Grow", color="blue", alpha=0.6, size=24)
+
+    cpu_freq = cpu_max_freq()
+    if cpu_freq is not None:
+        for ax in p.axes_dict.values():
+            post_delay = ftq_meta["args"]["post_delay"] * cpu_freq
+            ax.axvline(post_delay, color="red", alpha=0.4, zorder=0.9)
+            ax.text(post_delay + 2 * cpu_freq, ax.viewLim.max[1] * 0.02,
+                    "Shrink", color="red", alpha=0.6, size=24)
+            inflate_delay = ftq_meta["args"]["deflate_delay"] * cpu_freq
+            ax.axvline(inflate_delay, color="blue", alpha=0.4, zorder=0.9)
+            ax.text(inflate_delay + 2 * cpu_freq, ax.viewLim.max[1] * 0.02,
+                    "Grow", color="blue", alpha=0.6, size=24)
 
     for key, ax in p.axes_dict.items():
         if key != 1: ax.set_ylabel("")
@@ -243,3 +245,11 @@ def visualize_ftq(
         p.savefig(out / f"{save_as}.pdf", bbox_inches="tight", dpi=100)
         p.savefig(out / f"{save_as}.svg", bbox_inches="tight", dpi=100)
         dref_dataframe(save_as, out, ["Driver", "Cores", "Times"], ftq)
+
+
+def cpu_max_freq() -> float | None:
+    try:
+        freq = Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq").read_text()
+        return float(freq) * 1e3
+    except: pass
+    return None

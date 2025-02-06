@@ -12,8 +12,8 @@ As the artifact is packaged in a Docker image, the only prerequisites for the ev
   - We have tested this on Debian 12 with Linux 6.1 and 6.2.
 - At least 12 cores and 32GB RAM (more is better).
   - The multi-VM benchmarks require 24 cores and 48GB RAM.
-- Hyperthreading and TurboBoost should be disabled for more stable results.
-  - We also recommend fixing the CPU frequency and disabling powersaving modes (see [max_power.sh](/max_power.sh)).
+- HyperThreading and TurboBoost should be disabled for more stable results.
+  - We also recommend setting a fixed CPU frequency and disabling powersaving modes (see [max_power.sh](/max_power.sh)).
 - A properly installed and running Docker daemon.
 - For the VFIO benchmarks, we also need an IOMMU group that can be passed into a VM, as discussed below.
 
