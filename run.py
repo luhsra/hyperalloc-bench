@@ -20,7 +20,7 @@ from stream import bench as stream, plot as stream_plot
 
 @dataclass
 class Config:
-    vfio: int | None
+    vfio: str | None
     fast: bool
     extra: bool
     specs: bool
@@ -281,9 +281,9 @@ BENCHMARKS = [
             ("base-manual", []),
             ("huge-manual", []),
             ("llfree-manual", []),
-            ("llfree-manual", ["--suffix", "llfree-manual-vfio", "--vfio", "{vfio}"]),
+            ("llfree-manual", ["--suffix", "llfree-manual-vfio", "--vfio-dev", "{vfio}"]),
             ("virtio-mem", []),
-            ("virtio-mem", ["--suffix", "virtio-mem-vfio", "--vfio", "{vfio}"]),
+            ("virtio-mem", ["--suffix", "virtio-mem-vfio", "--vfio-dev", "{vfio}"]),
             # nofault
             ("base-manual", ["--suffix", "base-manual-nofault", "--nofault"]),
             ("huge-manual", ["--suffix", "huge-manual-nofault", "--nofault"]),
@@ -293,7 +293,7 @@ BENCHMARKS = [
                 [
                     "--suffix",
                     "llfree-manual-vfio-nofault",
-                    "--vfio",
+                    "--vfio-dev",
                     "{vfio}",
                     "--nofault",
                 ],
@@ -304,7 +304,7 @@ BENCHMARKS = [
                 [
                     "--suffix",
                     "virtio-mem-vfio-nofault",
-                    "--vfio",
+                    "--vfio-dev",
                     "{vfio}",
                     "--nofault",
                 ],
@@ -337,9 +337,9 @@ BENCHMARKS = [
             ("base-manual", ["--suffix", "virtio-balloon-stream"]),
             ("huge-manual", ["--suffix", "virtio-balloon-huge-stream"]),
             ("virtio-mem", ["--suffix", "virtio-mem-stream"]),
-            ("virtio-mem", ["--suffix", "virtio-mem-vfio-stream", "--vfio", "{vfio}"]),
+            ("virtio-mem", ["--suffix", "virtio-mem-vfio-stream", "--vfio-dev", "{vfio}"]),
             ("llfree-manual", ["--suffix", "llfree-stream"]),
-            ("llfree-manual", ["--suffix", "llfree-vfio-stream", "--vfio", "{vfio}"]),
+            ("llfree-manual", ["--suffix", "llfree-vfio-stream", "--vfio-dev", "{vfio}"]),
         ],
         long_modes=[],
         plot=stream_plot_fn,
@@ -367,9 +367,9 @@ BENCHMARKS = [
             ("base-manual", ["--suffix", "virtio-balloon-ftq"]),
             ("huge-manual", ["--suffix", "virtio-balloon-huge-ftq"]),
             ("virtio-mem", ["--suffix", "virtio-mem-ftq"]),
-            ("virtio-mem", ["--suffix", "virtio-mem-vfio-ftq", "--vfio", "{vfio}"]),
+            ("virtio-mem", ["--suffix", "virtio-mem-vfio-ftq", "--vfio-dev", "{vfio}"]),
             ("llfree-manual", ["--suffix", "llfree-ftq"]),
-            ("llfree-manual", ["--suffix", "llfree-vfio-ftq", "--vfio", "{vfio}"]),
+            ("llfree-manual", ["--suffix", "llfree-vfio-ftq", "--vfio-dev", "{vfio}"]),
         ],
         long_modes=[],
         plot=ftq_plot_fn,
@@ -388,12 +388,12 @@ BENCHMARKS = [
             ("llfree-auto", []),
             (
                 "llfree-auto",
-                ["--suffix", "{target}-llfree-auto-vfio", "--vfio", "{vfio}"],
+                ["--suffix", "{target}-llfree-auto-vfio", "--vfio-dev", "{vfio}"],
             ),
             ("virtio-mem", []),
             (
                 "virtio-mem",
-                ["--suffix", "{target}-virtio-mem-vfio", "--vfio", "{vfio}"],
+                ["--suffix", "{target}-virtio-mem-vfio", "--vfio-dev", "{vfio}"],
             ),
         ],
         long_modes=[
@@ -494,7 +494,10 @@ async def main():
         default="all",
         help="The benchmark to execute or 'all'",
     )
-    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
+    parser.add_argument(
+        "--vfio-dev",
+        help="A device from a bound VFIO group for passthrough"
+    )
     parser.add_argument(
         "--fast",
         action="store_true",
@@ -513,7 +516,7 @@ async def main():
     args = parser.parse_args()
 
     config = Config(
-        args.vfio, args.fast, args.extra, args.specs, args.port, args.qmp_port
+        args.vfio_dev, args.fast, args.extra, args.specs, args.port, args.qmp_port
     )
 
     if args.step == "build":

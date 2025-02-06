@@ -226,7 +226,9 @@ async def main(argv: Sequence[str] | None = None):
     parser.add_argument("--max-balloon", type=int, default=20)
     parser.add_argument("--post-delay", type=int, default=20)
     parser.add_argument("--deflate-delay", type=int, default=90)
-    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
+    parser.add_argument("--vfio", type=int,
+                        help="Bound VFIO group for passthrough. This passes through all devices in the group")
+    parser.add_argument("--vfio-dev", type=str, help="Device from a bound VFIO group for passthrough")
     Stream.args(parser)
     FTQ.args(parser)
     args, root = setup(parser, argv)
@@ -250,6 +252,7 @@ async def main(argv: Sequence[str] | None = None):
                 qmp_port=args.qmp,
                 extra_args=extra_args,
                 vfio_group=args.vfio,
+                vfio_device=args.vfio_dev,
             )
             await qemu_wait_startup(qemu, root / "boot.txt")
 

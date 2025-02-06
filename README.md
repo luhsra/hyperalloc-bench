@@ -41,6 +41,8 @@ Run a benchmark:
 sudo -E ./max_power.sh python compiling/compiling.py --mode <mode> --img <path/to/disk.qcow2> -c 8 -m 8
 ```
 
+> The `max_power.sh` script disables powersaving and frequency scaling on Intel CPUs.
+
 The `mode` specifies the paths to the guest kernel and QEMU to be used. You can manually overwrite them with the `--kernel` and `--qemu` arguments.
 The benchmark `mode` can be one of the following:
 - `base-manual`: Unmodified QEMU and guest with manual virtio-balloon
@@ -67,8 +69,10 @@ sudo python3 bind_vfio.py
 
 > This only works if your system supports IOMMUs and for Intel, the IOMMUs have to be activated via the kernel commandline `intel_iommu=on`.
 
-Then the vfio-group can be given to the benchmark, which then passes it through to the VMs.
+Then the devices from that vfio group can be given to the benchmark, which then passes it through to the VMs.
 
 ```sh
+sudo -E ./max_power.sh python compiling.py ... --vfio-dev <device-id>
+# or alternative bind all device from that group
 sudo -E ./max_power.sh python compiling.py ... --vfio <group-number>
 ```

@@ -21,6 +21,7 @@ def qemu_vm(
     qmp_port: int = 5023,
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
+    vfio_device: str | None = None,
     vfio_group: int | None = None,
     slice: str | None = None,
     core_start: int = 0,
@@ -55,6 +56,7 @@ def qemu_vm(
         "-no-reboot",
         "--cpu", "host",
         *extra_args,
+        *vfio_dev_arg(vfio_device),
         *vfio_args(vfio_group),
     ]
 
@@ -81,9 +83,13 @@ def qemu_vm(
     # Pin qemu to a cpuset on one numa node with one core per vcpu
     step = 1
     if logical > physical:
-        print("\033[31mWARNING: SMT detected!\033[0m")
-        step = 2
-    assert cores <= physical, "Not enough cores"
+        print("\033[31mWARNING: SMT detected, results might be less accurate!\033[0m")
+        if (core_start + cores) <= physical:
+            step = 2
+            print("  \033[33mPinning on physical cores!\033[0m")
+        else:
+            print("  \033[33mPinning on logical cores!\033[0m")
+    assert (core_start + cores * step) <= logical, "Not enough cores"
 
     cpu_set = [x * step for x in range(core_start, core_start + cores)]
 
@@ -93,6 +99,14 @@ def qemu_vm(
     return process
 
 
+def vfio_dev_arg(dev: str | None) -> list[str]:
+    if not dev:
+        return []
+    if len(dev) < 12:
+        dev = f"0000:{dev}"
+    return ["-device", json.dumps({"driver": "vfio-pci", "host": dev})]
+
+
 def vfio_args(iommu_group: int | None) -> list[str]:
     if iommu_group is None:
         return []
@@ -100,14 +114,7 @@ def vfio_args(iommu_group: int | None) -> list[str]:
         Path("/dev/vfio") / str(iommu_group)
     ).exists(), "IOMMU Group is not bound to VFIO!"
     path = Path("/sys/kernel/iommu_groups") / str(iommu_group) / "devices"
-    return list(
-        chain(
-            *[
-                ["-device", json.dumps({"driver": "vfio-pci", "host": d.name})]
-                for d in path.iterdir()
-            ]
-        )
-    )
+    return list(chain(*[vfio_dev_arg(d) for d in path.iterdir()]))
 
 
 async def qemu_wait_startup(qemu: Popen[str], logfile: Path):

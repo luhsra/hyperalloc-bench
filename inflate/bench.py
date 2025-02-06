@@ -38,7 +38,9 @@ async def main(argv: Sequence[str] | None = None):
     )
     parser.add_argument("--nofault", action="store_true")
     parser.add_argument("--module")
-    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
+    parser.add_argument("--vfio", type=int,
+                        help="Bound VFIO group for passthrough. This passes through all devices in the group")
+    parser.add_argument("--vfio-dev", type=str, help="Device from a bound VFIO group for passthrough")
     args, root = setup(parser, argv)
 
     assert not (not args.nofault and args.module is None), "Need to specify a module"
@@ -59,6 +61,7 @@ async def main(argv: Sequence[str] | None = None):
             qmp_port=args.qmp,
             extra_args=extra_args,
             vfio_group=args.vfio,
+            vfio_device=args.vfio_dev,
         )
         ps_proc = Process(qemu.pid)
 

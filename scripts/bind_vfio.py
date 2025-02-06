@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from subprocess import check_output, check_call
 from pathlib import Path
 from time import sleep
@@ -14,7 +16,18 @@ def list_groups():
 
 # Pass all devices from the group to VFIO
 def pass_to_vfio(group: Path):
-    for device in sorted((group / "devices").iterdir()):
+    devices = list(sorted((group / "devices").iterdir()))
+
+    if len(devices) > 1:
+        print("Group has more than one device. Select one to pass through or 'all'")
+        for i, device in enumerate(devices):
+            print(f"  {i}: {check_output(['lspci', '-nns', device.name], text=True).strip()}")
+        response = input("Device: ").strip()
+        if response != "all":
+            selected = int(response)
+            devices = [devices[selected]]
+
+    for device in devices:
         (device / "driver/unbind").write_text(device.name)
         check_call(["modprobe", "vfio-pci"])
         (device / "driver_override").write_text("vfio-pci")

@@ -78,7 +78,7 @@ This section continues with the more extensive benchmark setup from the paper.
 ### VFIO and Device Passthrough
 
 There are a few benchmarks that use device passthrough.
-If you do not have a system supporting device passthrough, you can skip this step and the benchmarks by omitting the `--vfio <group>` argument for the `run.py` runner below.
+If you do not have a system supporting device passthrough, you can skip this step and the benchmarks by omitting the `--vfio <device>` argument for the `run.py` runner below.
 
 As the device is not directly used (we only measure the general overheads of device passthrough), it does not matter what device it is.
 For our measurements, we passed an Ethernet controller into the VMs, but USB or other controllers should work fine.
@@ -155,7 +155,7 @@ The benchmarks can be executed with:
 cd hyperalloc-bench
 source venv/bin/activate
 
-./run.py bench-plot -b all --vfio <group>
+./run.py bench-plot -b all --vfio <device-id>
 # (sum of all benchmark times)
 ```
 
@@ -164,7 +164,7 @@ source venv/bin/activate
 - `bench-plot` can be replaced with `bench` or `plot` to only run the benchmarks or redraw the plots.
 - `all` can be replaced with a specific benchmark like `compiling`.
 - If you want to run the additional `compile` benchmarks that evaluate the virtio-balloon parameters, add the `--extra` argument. This extends the runtime by about 8h.
-- The VFIO `<group>` has to be the one passed into the docker container. You can omit this if you want to skip the VFIO benchmarks.
+- The VFIO `<device-id>` has to be a device ID (like `08:00.0`) from the VFIO group passed to the container. You can omit this if you want to skip the VFIO benchmarks.
 
 
 The results can be found in the `~/hyperalloc-bench/artifact-eval/<benchmark>` directory within the docker container.

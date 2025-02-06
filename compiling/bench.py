@@ -65,7 +65,9 @@ async def main(argv: Sequence[str] | None = None):
         "--mode", choices=list(BALLOON_CFG.keys()), required=True, action=ModeAction
     )
     parser.add_argument("--target", choices=list(TARGET.keys()), required=True)
-    parser.add_argument("--vfio", type=int, help="Bound VFIO group for passthrough")
+    parser.add_argument("--vfio", type=int,
+                        help="Bound VFIO group for passthrough. This passes through all devices in the group")
+    parser.add_argument("--vfio-dev", type=str, help="Device from a bound VFIO group for passthrough")
     parser.add_argument("--vmem-fraction", type=float, default=1 / 16)
     parser.add_argument("--fpr-delay", type=int, help="Delay between reports in ms")
     parser.add_argument("--fpr-capacity", type=int, help="Size of the fpr buffer")
@@ -98,6 +100,7 @@ async def main(argv: Sequence[str] | None = None):
                 qmp_port=args.qmp,
                 extra_args=extra_args,
                 vfio_group=args.vfio,
+                vfio_device=args.vfio_dev,
             )
             ps_proc = Process(qemu.pid)
 
