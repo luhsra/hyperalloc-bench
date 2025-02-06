@@ -103,7 +103,7 @@ class Measure:
             total = meminfo["MemTotal"] + (self._reserved_mem or 0)
             cached = meminfo["Cached"]
             self._errors = 0
-            return small, huge, total, cached
+            return small, huge, cached, total
         except CalledProcessError as e:
             print("VM Stats Error")
             assert self.ps_proc.is_running()
