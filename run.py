@@ -296,7 +296,7 @@ BENCHMARKS = [
         "inflate",
         inflate.main,
         default={"iter": 10},
-        fast={"iter": 3},
+        fast={"iter": 2},
         args=["-m20", "-c12", "--shrink-target", "2", "-i{iter}"],
         modes=[
             ("base-manual", []),
@@ -404,7 +404,6 @@ BENCHMARKS = [
         modes=[
             ("base-manual", []),
             ("base-auto", []),
-            ("huge-auto", []),
             ("llfree-manual", []),
             ("llfree-auto", []),
             (
