@@ -24,6 +24,8 @@ class Config:
     fast: bool
     extra: bool
     specs: bool
+    stream_iters: int
+    ftq_iters: int
     port: int
     qmp_port: int
 
@@ -58,6 +60,8 @@ class Benchmark:
 
         replacements = self.fast if config.fast else self.default
         replacements["vfio"] = config.vfio
+        replacements["stream_iters"] = config.stream_iters
+        replacements["ftq_iters"] = config.ftq_iters
 
         print(f"\n\x1b[94mRunning {self.name} bench\x1b[0m")
         base_args = self.args + [
@@ -71,15 +75,19 @@ class Benchmark:
         ]
 
         async def run_mode(mode: str, extra_args: list[str]):
-            args = base_args + extra_args + ["--mode", mode]
-            if any([("{vfio}" in arg) for arg in args]) and config.vfio is None:
-                print(f"\n\x1b[94mSkipping {mode} because vfio is not set\x1b[0m")
-                return
+            try:
+                args = base_args + extra_args + ["--mode", mode]
+                if any([("{vfio}" in arg) for arg in args]) and config.vfio is None:
+                    print(f"\n\x1b[94mSkipping {mode} because vfio is not set\x1b[0m")
+                    return
 
-            args = [arg.format(**replacements) for arg in args]
-            filename = Path(self.function.__code__.co_filename).relative_to(ROOT)
-            print(f"\n\x1b[94mRunning {mode}: {filename} {' '.join(args)}\x1b[0m")
-            await self.function(args)
+                args = [arg.format(**replacements) for arg in args]
+                filename = Path(self.function.__code__.co_filename).relative_to(ROOT)
+                print(f"\n\x1b[94mRunning {mode}: {filename} {' '.join(args)}\x1b[0m")
+                await self.function(args)
+            except Exception as e:
+                print(f"\x1b[91mFailed to run {mode}: {e}\x1b[0m")
+                print(f"\x1b[91m{traceback.format_exc()}\x1b[0m")
 
         for mode, extra_args in self.modes:
             await run_mode(mode, extra_args)
@@ -101,6 +109,7 @@ class Benchmark:
 def inflate_plot_fn(bench: Benchmark, config: Config):
     root = bench.root()
     vfio = config.vfio is not None
+    inflate_plot.init()
     inflate_plot.visualize(
         [
             root / "base-manual",
@@ -137,8 +146,8 @@ def stream_plot_fn(bench: Benchmark, config: Config):
         "Baseline",
     ]
 
-    stream, stream_meta = stream_plot.load_streams(root, drivers)
     stream_plot.init()
+    stream, stream_meta = stream_plot.load_streams(root, drivers)
     stream_plot.visualize_stream(
         [
             "virtio-balloon",
@@ -165,8 +174,8 @@ def ftq_plot_fn(bench: Benchmark, config: Config):
         "HyperAlloc",
         "Baseline",
     ]
-    ftq, ftq_meta = stream_plot.load_ftqs(root, drivers)
     stream_plot.init()
+    ftq, ftq_meta = stream_plot.load_ftqs(root, drivers)
     stream_plot.visualize_ftq(
         [
             "virtio-balloon",
@@ -324,7 +333,7 @@ BENCHMARKS = [
             "--stream-size",
             "45000000",
             "--bench-iters",
-            "1900",
+            "{stream_iters}",
             "--bench-threads",
             "1",
             "4",
@@ -358,7 +367,7 @@ BENCHMARKS = [
             "4",
             "12",
             "--bench-iters",
-            "1096",
+            "{ftq_iters}",
             "--max-balloon",
             "18",
         ],
@@ -513,10 +522,14 @@ async def main():
     parser.add_argument(
         "--qmp-port", type=int, default=5400, help="QMP port of the VMs"
     )
+    parser.add_argument("--stream-iters", type=int, default=1900, help="Number of stream iterations")
+    parser.add_argument("--ftq-iters", type=int, default=1096, help="Number of stream iterations")
     args = parser.parse_args()
 
     config = Config(
-        args.vfio_dev, args.fast, args.extra, args.specs, args.port, args.qmp_port
+        args.vfio_dev, args.fast, args.extra, args.specs,
+        args.stream_iters, args.ftq_iters,
+        args.port, args.qmp_port
     )
 
     if args.step == "build":

@@ -10,9 +10,10 @@ As the artifact is packaged in a Docker image, the only prerequisites for the ev
 
 - A Linux-based system (for KVM).
   - We have tested this on Debian 12 with Linux 6.1 and 6.2.
-- At least 12 physical cores and 32GB RAM (more is better).
-  - The multi-VM benchmarks require 24 physical cores and 48GB RAM.
+- At least 12 cores and 32GB RAM (more is better).
+  - The multi-VM benchmarks require 24 cores and 48GB RAM.
 - Hyperthreading and TurboBoost should be disabled for more stable results.
+  - We also recommend fixing the CPU frequency and disabling powersaving modes (see [max_power.sh](/max_power.sh)).
 - A properly installed and running Docker daemon.
 - For the VFIO benchmarks, we also need an IOMMU group that can be passed into a VM, as discussed below.
 
@@ -86,21 +87,22 @@ For our measurements, we passed an Ethernet controller into the VMs, but USB or 
 Generally, you have to bind an IOMMU group to VFIO and pass it into the docker container.
 Inside the container, it is passed into the respective VMs.
 
-The [/scripts/bind_vfio.py](/scripts/bind_vfio.py) script be used to bind IOMMU groups to VFIO (tested on Debian 12, Linux 6.1).
+The [/scripts/bind_vfio.py](/scripts/bind_vfio.py) script can be used to bind IOMMU groups to VFIO (tested on Debian 12 with Linux 6.1 and Fedora 41 with Linux 6.12).
 Executing it (outside the docker container), shows you all IOMMU groups and their corresponding devices.
 You can then enter a group number to bind it to VFIO.
 It should then be visible under `/dev/vfio/<group>`.
 Note that if you bind an IOMMU group, all devices of this group cannot be used by the host anymore.
+Also, you will need a device ID from the group (like `08:00.0`) later for the benchmark runner.
 
 > If the script shows you no devices, ensure that the IOMMU on the host is enabled.
 > For Intel systems this might require an additional kernel commandline parameter (`intel_iommu=on`), which you can add to your `/etc/default/grub` `GRUB_CMDLINE_LINUX_DEFAULT` config, for example.
 >
 > If this script fails for other reasons, you might have to do this [manually](https://www.kernel.org/doc/html/latest/driver-api/vfio.html#vfio-usage-example) for your respective Linux version.
 
-The next step is to give the docker container access to the `/dev/vfio/<group>` device in the next section.
+The next step is to give the docker container access to the `/dev/vfio/<group>` device and allow it to lock and pin 50GiB of memory.
 
 ```sh
-./artifact-eval/run.sh --device /dev/vfio/vfio --device /dev/vfio/<group> --ulimit memlock=53687091200:53687091200
+./artifact-eval/run.sh --device /dev/vfio --ulimit memlock=53687091200:53687091200
 ```
 
 > The `--device` and `--ulimit` parameters can be omitted if you want to skip the VFIO benchmarks.
@@ -173,6 +175,21 @@ The subdirectories contain the raw data and metadata, such as system, environmen
 
 The data from the paper is located in the `~/hyperalloc-bench/<benchmark>/latest` directories and the plots in `~/hyperalloc-bench/<benchmark>/out` (`<benchmark>` can be `compiling`, `inflate`, `multivm`, `stream`).
 The `stream` directory also contains the `ftq` data.
+
+
+### Stream and FTQ Parameters
+
+The parameters for the STREAM and FTQ benchmarks were chosen based on the hardware memory bandwidth and CPU frequency of our test system.
+The results on your hardware might be skewed a bit.
+However, the overall trends should be similar.
+
+If the stream benchmark terminates before growing the VM, you might have to increase the `--stream-iters` parameter.
+
+The FTQ benchmark highly depends on the CPU frequency.
+Thus, the "shrink" and "grow" markers might not be aligned correctly in the plots.
+This is especially the case if the CPU frequency varies (frequency scaling, TurboBoost).
+However, the general trends (noticeable reductions in work for virtio-balloon and virtio-mem+VFIO) should be similar to the paper.
+Also, you can increase the runtime with the `--ftq-iters` parameter.
 
 
 ## Exploring the Artifacts

@@ -123,7 +123,7 @@ def visualize_stream(
     p.set(ylabel="Bandwith [GB/s]")
     p.set(xlabel="Runtime [s]")
     p.set(ylim=(0, None))
-    p.set(xlim=(0, 140))
+    p.set(xlim=(0, stream["IterTime"].max()))
     for ax in p.axes_dict.values():
         ax.axvline(
             stream_meta["args"]["post_delay"], color="red", alpha=0.4, zorder=0.9

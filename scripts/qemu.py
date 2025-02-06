@@ -83,12 +83,12 @@ def qemu_vm(
     # Pin qemu to a cpuset on one numa node with one core per vcpu
     step = 1
     if logical > physical:
-        print("\033[31mWARNING: SMT detected, results might be less accurate!\033[0m")
+        print("\033[33mWARNING: SMT detected, results might be less stable!\033[0m")
         if (core_start + cores) <= physical:
             step = 2
-            print("  \033[33mPinning on physical cores!\033[0m")
+            print("  \033[33mPinning on physical cores.\033[0m")
         else:
-            print("  \033[33mPinning on logical cores!\033[0m")
+            print("  \033[33mPinning on logical cores.\033[0m")
     assert (core_start + cores * step) <= logical, "Not enough cores"
 
     cpu_set = [x * step for x in range(core_start, core_start + cores)]
@@ -104,17 +104,18 @@ def vfio_dev_arg(dev: str | None) -> list[str]:
         return []
     if len(dev) < 12:
         dev = f"0000:{dev}"
+    path = Path("/sys/bus/pci/devices") / dev
+    assert path.exists(), f"Device {dev} not found!"
+    assert (path / "driver").read_text().strip() == "vfio-pci", f"Device {dev} not bound to vfio!"
     return ["-device", json.dumps({"driver": "vfio-pci", "host": dev})]
 
 
 def vfio_args(iommu_group: int | None) -> list[str]:
     if iommu_group is None:
         return []
-    assert (
-        Path("/dev/vfio") / str(iommu_group)
-    ).exists(), "IOMMU Group is not bound to VFIO!"
+    assert (Path("/dev/vfio") / str(iommu_group)).exists(), "IOMMU Group is not bound to VFIO!"
     path = Path("/sys/kernel/iommu_groups") / str(iommu_group) / "devices"
-    return list(chain(*[vfio_dev_arg(d) for d in path.iterdir()]))
+    return list(chain(*[vfio_dev_arg(d.name) for d in path.iterdir()]))
 
 
 async def qemu_wait_startup(qemu: Popen[str], logfile: Path):

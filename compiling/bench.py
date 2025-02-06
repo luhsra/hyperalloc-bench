@@ -128,7 +128,7 @@ async def main(argv: Sequence[str] | None = None):
                 )
 
             resize_callback = None
-            if args.mode.startswith("virtio-mem-"):
+            if args.mode == "virtio-mem":
                 client = QMPClient("compile vm")
                 await client.connect(("127.0.0.1", args.qmp))
                 max_bytes = args.mem * 1024**3
@@ -258,5 +258,4 @@ async def main(argv: Sequence[str] | None = None):
 
 
 if __name__ == "__main__":
-    print("compile")
     asyncio.run(main())

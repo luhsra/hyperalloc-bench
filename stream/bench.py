@@ -162,6 +162,9 @@ class FTQ(Bench):
 
     async def results(self):
         await self._ssh.download(Path(self._HOME) / "*.dat", self._results)
+        if self._threads == 1:
+            (self._results / "ftq_0_counts.dat").rename(self._results / "counts.dat")
+            (self._results / "ftq_0_times.dat").rename(self._results / "times.dat")
 
 
 def build_taskset(cpus: Iterable[int]) -> int:

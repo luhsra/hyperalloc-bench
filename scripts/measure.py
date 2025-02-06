@@ -49,6 +49,7 @@ class Measure:
         self._time = time_start or time()
         self._vm_stats_task: Task[tuple[float, float, float, float]] | None = None
         self._callback_task: Task | None = None
+        self._errors = 0
 
     async def __call__(
         self, process: Popen[str] | asyncio.subprocess.Process | None = None
@@ -93,14 +94,31 @@ class Measure:
 
     async def vm_stats(self) -> tuple[float, float, float, float]:
         try:
-            small, huge = free_pages(await self.ssh.output("cat /proc/buddyinfo"))
-            meminfo = parse_meminfo(await self.ssh.output("cat /proc/meminfo"))
+            small, huge = free_pages(
+                await self.ssh.output("cat /proc/buddyinfo", timeout=30)
+            )
+            meminfo = parse_meminfo(
+                await self.ssh.output("cat /proc/meminfo", timeout=30)
+            )
             total = meminfo["MemTotal"] + (self._reserved_mem or 0)
             cached = meminfo["Cached"]
+            self._errors = 0
             return small, huge, total, cached
         except CalledProcessError as e:
-            print("VM Stats Error:", e)
+            print("VM Stats Error")
             assert self.ps_proc.is_running()
+            self._errors += 1
+            if self._errors > 5:
+                print("Too many errors!")
+                raise e
+            return nan, nan, nan, nan
+        except asyncio.TimeoutError as e:
+            print("VM Stats Timeout")
+            assert self.ps_proc.is_running()
+            self._errors += 1
+            if self._errors > 5:
+                print("Too many errors!")
+                raise e
             return nan, nan, nan, nan
 
     def sec(self) -> float:
