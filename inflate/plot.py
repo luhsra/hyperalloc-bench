@@ -37,10 +37,10 @@ def parse_logs(path: Path) -> pd.DataFrame:
             mode = "virtio-balloon"
         case n if "huge-manual" in n:
             mode = "virtio-balloon-huge"
-        case n if "virtio-mem" in n:
-            mode = "virtio-mem"
         case n if "virtio-mem-vfio" in n:
             mode = "virtio-mem+VFIO"
+        case n if "virtio-mem" in n:
+            mode = "virtio-mem"
         case n if "llfree-manual-vfio" in n:
             mode = "HyperAlloc+VFIO"
         case n if "llfree-manual" in n:
@@ -57,7 +57,6 @@ def visualize(touched: list[Path], untouched: list[Path], save_as: str | None = 
     if data["iter"].max() > 0:
         data = data[data["iter"] > 0]
     data["install"] = data["touch"] + data["grow"]
-    print(data)
     max_access = (1 / data["touch2"]).max()
 
     pgd = data.melt(id_vars=["mode", "iter"], value_vars=["shrink", "grow", "touch", "install"],
@@ -68,7 +67,6 @@ def visualize(touched: list[Path], untouched: list[Path], save_as: str | None = 
     data = pd.concat([parse_logs(p) for p in untouched])
     if data["iter"].max() > 0:
         data = data[data["iter"] > 0]
-    print(data)
 
     pgd1 = data.melt(id_vars=["mode", "iter"], value_vars=["shrink", "grow"],
                     var_name="op", value_name="time")
