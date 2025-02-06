@@ -106,7 +106,7 @@ def vfio_dev_arg(dev: str | None) -> list[str]:
         dev = f"0000:{dev}"
     path = Path("/sys/bus/pci/devices") / dev
     assert path.exists(), f"Device {dev} not found!"
-    assert (path / "driver").read_text().strip() == "vfio-pci", f"Device {dev} not bound to vfio!"
+    assert (path / "driver_override").read_text().strip() == "vfio-pci", f"Device {dev} not bound to vfio!"
     return ["-device", json.dumps({"driver": "vfio-pci", "host": dev})]
 
 
