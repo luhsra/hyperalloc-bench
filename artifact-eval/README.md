@@ -22,12 +22,12 @@ As the artifact is packaged in a Docker image, the only prerequisites for the ev
 
 In the paper, we use the following benchmarks:
 
-- `inflate` (section 5.3): Inflation/deflation latency (about 20min)
-- `stream` (section 5.4): STREAM memory bandwidth benchmark (about 15min)
-- `ftq` (section 5.4): FTQ CPU work benchmark (about 15min)
+- `inflate` (section 5.3): Inflation/deflation latency (about 30min)
+- `stream` (section 5.4): STREAM memory bandwidth benchmark (about 30min)
+- `ftq` (section 5.4): FTQ CPU work benchmark (about 30min)
 - `compiling` (section 5.5): Clang compilation with auto VM inflation (about 6h and +8h with `--extra`)
-- `blender` (section 5.5): SPEC CPU 2017 blender benchmark (about 40min)
-- `multivm` (section 5.6): Compiling clang on multiple concurrent VMs (about 60h)
+- `blender` (section 5.5): SPEC CPU 2017 blender benchmark (about 1h)
+- `multivm` (section 5.6): Compiling clang on multiple concurrent VMs (about 50h)
 
 The `inflate` benchmark measures the latency for shrinking and growing VMs.
 In the paper we claim that HyperAlloc is significantly faster that all other techniques for reclaiming memory (touched and untouched) and returning memory.
@@ -181,22 +181,22 @@ cd hyperalloc-bench
 source venv/bin/activate
 
 ./run.py bench-plot -b all --vfio <device-id>
-# all takes about 68h (sum of all benchmark times)
-# or 76h with --extra
+# all takes about 58h (sum of all benchmarks)
+# or 66h with --extra
 # or 3h with --fast
 
-# inflate: about 20min
-# stream: about 15min
-# ftq: about 15min
+# inflate: about 30min
+# stream: about 30min
+# ftq: about 30min
 # compiling: about 6h and +8h with --extra
-# blender: about 40min
-# multivm: about 60h
+# blender: about 1h
+# multivm: about 50h
 ```
 
-> For testing purposes, we would recommend executing the benchmarks with the `--fast` parameter first, which uses the [`write`](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) micro-benchmark instead of the hour-long clang compilation as workloads.
-> This takes about 3h.
+> For testing purposes, we would recommend executing the benchmarks with the `--fast` parameter first, which uses the [`write`](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) micro-benchmark for the `compiling` and `multivm` benchmarks.
+> In total, this takes about 3h.
 >
-> However, the results are not expected to be accurate!
+> Note that the results of `compiling` and `multivm` are not expected to be very accurate with `--fast`.
 
 - `bench-plot` can be replaced with `bench` or `plot` to only run the benchmarks or redraw the figures.
 - `all` can be replaced with a specific benchmark like `compiling`.
@@ -228,7 +228,7 @@ Also, you can increase the runtime with the `--ftq-iters` parameter.
 
 ### SPEC CPU 2017
 
-The [SPEC benchmark suite](https://www.spec.org/cpu2017/) is not open source, and thus could not be included in this artifact.
+The [SPEC benchmark suite](https://www.spec.org/cpu2017/) is not open source, and thus could not be included in this public artifact.
 However, you can install it yourself and they have a discount for educational institutions.
 
 We have a single benchmark from this suite in the paper, the `blender` benchmark, in section 5.5.
@@ -243,8 +243,10 @@ cd hyperalloc-bench
 source venv/bin/activate
 
 ./run.py bench-plot -b blender
-# (about 40min)
+# (about 1h)
 ```
+
+> If you do not have access to SPEC CPU, you can run this setup with the [`write`](https://github.com/luhsra/llfree-rs/blob/main/bench/src/bin/write.rs) micro benchmark instead (`./run.py bench-plot -b blender --fast`).
 
 
 ## Exploring the Artifacts
@@ -264,10 +266,10 @@ Now, you can explore the `llfree_ae` directory with your file manager.
 The home directory contains the following subdirectories:
 
 - [hyperalloc-bench](https://github.com/luhsra/hyperalloc-bench): Collection of benchmark scripts for HyperAlloc.
-  - `compiling`: Contains the clang auto reclamation benchmark.
   - `inflate`: Contains the inflate/deflate latency benchmark.
-  - `multivm`: Contains the multi-VM benchmarks.
   - `stream`: Contains the STREAM and FTQ benchmarks.
+  - `compiling`: Contains the clang and blender auto reclamation benchmark.
+  - `multivm`: Contains the multi-VM benchmarks.
 - [hyperalloc-qemu](https://github.com/luhsra/hyperalloc-qemu): The QEMU with integrated HyperAlloc.
 - [hyperalloc-linux](https://github.com/luhsra/hyperalloc-linux): The Linux Kernel with integrated HyperAlloc.
 - [hyperalloc-stream](https://github.com/luhsra/hyperalloc-stream): The STREAM memory bandwidth benchmark.

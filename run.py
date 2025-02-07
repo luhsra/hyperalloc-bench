@@ -295,7 +295,7 @@ BENCHMARKS = [
     Benchmark(
         "inflate",
         inflate.main,
-        default={"iter": 10},
+        default={"iter": 5},
         fast={"iter": 2},
         args=["-m20", "-c12", "--shrink-target", "2", "-i{iter}"],
         modes=[
