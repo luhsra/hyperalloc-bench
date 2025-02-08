@@ -238,6 +238,29 @@ We have a single benchmark from this suite in the paper, the `blender` benchmark
 If you want to reproduce our results for this benchmark, you have to [install SPEC 2017](https://www.spec.org/cpu2017/Docs/quick-start.html) inside the VM image (inside docker under `~/hyperalloc-bench/resources/debian.qcow2`).
 The `~/hyperalloc-bench/scripts/base.sh` contains the arguments to start a VM to access the disk image.
 
+```sh
+# (outside the container)
+scp -P2222 cpu2017-1.1.9.iso user@localhost:
+
+# (inside the container)
+cd hyperalloc-bench
+./scripts/base.sh --cdrom ~/cpu2017-1.1.9.iso
+
+# (inside the VM)
+mkdir spec-iso
+sudo mount /dev/sr0 spec-iso
+cd spec-iso
+./install.sh
+# enter: /home/debian/cpu2017
+cd ~/cpu2017
+cp config/Example-gcc-linux-x86.cfg config/ballooning.cfg
+vim config/ballooning.cfg
+# set gcc_dir to "/usr"
+source shrc
+runcpu --config=ballooning --action=setup 526.blender_r
+# (about 20min)
+```
+
 Then you can execute the benchmark with:
 
 ```sh
