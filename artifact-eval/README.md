@@ -258,7 +258,7 @@ vim config/ballooning.cfg
 # set gcc_dir to "/usr"
 source shrc
 runcpu --config=ballooning --action=setup 526.blender_r
-# (about 20min)
+# (about 50min)
 ```
 
 Then you can execute the benchmark with:
