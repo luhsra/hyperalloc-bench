@@ -89,7 +89,10 @@ After connecting to the container, you can execute the "inflate" benchmark, whic
 cd hyperalloc-bench
 source venv/bin/activate
 
-./run.py bench-plot -c inflate --fast
+# you might again have to give yourself access to kvm
+sudo chown $USER /dev/kvm
+
+./run.py bench-plot -b inflate --fast
 # (about 20min)
 ```
 
