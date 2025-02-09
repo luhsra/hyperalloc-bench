@@ -19,3 +19,4 @@ __pycache__/
 /artifact-eval/stream
 /artifact-eval/ftq
 /artifact-eval/hyperalloc_ae
+/artifact-eval/test

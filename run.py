@@ -14,7 +14,8 @@ import sys
 from compiling import bench as compiling, plot as compiling_plot
 from inflate import bench as inflate, plot as inflate_plot
 from multivm import bench as mutlivm, plot as multivm_plot
-from scripts.config import ROOT
+from scripts.config import BALLOON_CFG, DEFAULT_DISK, DEFAULTS, ROOT
+from scripts.qemu import qemu_vm, qemu_wait_startup
 from stream import bench as stream, plot as stream_plot
 
 
@@ -107,7 +108,7 @@ class Benchmark:
 
 def inflate_plot_fn(bench: Benchmark, config: Config):
     root = bench.root()
-    vfio = config.vfio is not None
+    vfio = (root / "llfree-manual-vfio").exists()
     inflate_plot.init()
     inflate_plot.visualize(
         [
@@ -134,7 +135,7 @@ def inflate_plot_fn(bench: Benchmark, config: Config):
 def stream_plot_fn(bench: Benchmark, config: Config):
     root = bench.root()
 
-    vfio = config.vfio is not None
+    vfio = (root / "llfree-vfio-stream").exists()
     drivers = [
         "virtio-balloon",
         "virtio-balloon-huge",
@@ -163,7 +164,7 @@ def stream_plot_fn(bench: Benchmark, config: Config):
 
 def ftq_plot_fn(bench: Benchmark, config: Config):
     root = bench.root()
-    vfio = config.vfio is not None
+    vfio = (root / "llfree-vfio-ftq").exists()
     drivers = [
         "virtio-balloon",
         "virtio-balloon-huge",
@@ -211,7 +212,7 @@ def compiling_plot_fn(bench: Benchmark, config: Config):
         f"{target}-auto",
         out=root,
     )
-    if config.vfio is not None:
+    if (root / f"{target}-virtio-mem-vfio").exists():
         compiling_plot.visualize(
             {
                 "virtio-mem+VFIO": root / f"{target}-virtio-mem-vfio",
@@ -244,7 +245,7 @@ def compiling_plot_fn(bench: Benchmark, config: Config):
         "HyperAlloc": ("", root / f"{target}-llfree-auto"),
         "HyperAlloc+VFIO": ("", root / f"{target}-llfree-auto-vfio"),
     }
-    if not config.vfio:
+    if not paths["HyperAlloc+VFIO"][1].exists():
         paths.pop("virtio-mem+VFIO")
         paths.pop("HyperAlloc+VFIO")
     compiling_plot.overview(
@@ -508,6 +509,31 @@ async def build():
     )
 
 
+async def verify_vfio(config: Config):
+    qemu = None
+    try:
+        root = Path("artifact-eval") / "test"
+        root.mkdir(parents=True, exist_ok=True)
+        mem = 8
+        cores = 8
+        defaults = DEFAULTS["base"]
+        qemu = qemu_vm(
+            defaults["qemu"],
+            config.port,
+            defaults["kernel"],
+            cores,
+            hda=DEFAULT_DISK,
+            qmp_port=config.qmp_port,
+            extra_args=BALLOON_CFG["base-manual"](cores, mem, mem, mem),
+            vfio_device=config.vfio,
+        )
+        assert qemu.poll() is None, "Qemu crashed"
+        await qemu_wait_startup(qemu, root / "boot.txt")
+    finally:
+        if qemu: qemu.terminate()
+        await asyncio.sleep(3)
+
+
 async def main():
     parser = ArgumentParser(description="Benchmark Runner")
     benchmarks = {benchmark.name: benchmark for benchmark in BENCHMARKS}
@@ -534,6 +560,17 @@ async def main():
 
     if args.step == "build":
         await build()
+        return
+
+    if args.vfio_dev is not None and args.step != "plot":
+        try:
+            print("\n\x1b[94mVerifying VFIO...\x1b[0m")
+            await verify_vfio(config)
+            print("\x1b[92mVFIO successful\x1b[0m")
+        except Exception as e:
+            print(f"\x1b[91mFailed to verify VFIO: {e}\x1b[0m")
+            print(f"\x1b[91m{traceback.format_exc()}\x1b[0m")
+            return
 
     for benchmark in BENCHMARKS:
         if (args.bench == "all" and benchmark.name != "blender") or args.bench == benchmark.name:

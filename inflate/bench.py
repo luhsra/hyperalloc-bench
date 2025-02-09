@@ -155,6 +155,7 @@ async def main(argv: Sequence[str] | None = None):
                 errfile.write(e.stdout)
             if e.stderr:
                 errfile.write(e.stderr)
+        raise e
     finally:
         print("terminate...")
         if qmp:

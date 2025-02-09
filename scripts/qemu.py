@@ -13,10 +13,10 @@ from scripts.utils import non_block_read, rm_ansi_escape
 def qemu_vm(
     qemu: str | Path = "qemu-system-x86_64",
     port: int = 5022,
-    kernel: str = "bzImage",
+    kernel: str | Path = "bzImage",
     cores: int = 8,
     sockets: int = 1,
-    hda: str = "resources/hda.qcow2",
+    hda: str | Path = "resources/hda.qcow2",
     kvm: bool = True,
     qmp_port: int = 5023,
     extra_args: list[str] | None = None,
@@ -42,14 +42,14 @@ def qemu_vm(
 
     base_args = [
         # fmt: off
-        qemu,
+        str(qemu),
         #"-m", f"{mem}G",
         "-smp", f"{cores}",
-        "-hda", hda,
+        "-hda", str(hda),
         "-snapshot",
         "-serial", "mon:stdio",
         "-nographic",
-        "-kernel", kernel,
+        "-kernel", str(kernel),
         "-append", "root=/dev/sda3 console=ttyS0 nokaslr",
         "-qmp", f"tcp:localhost:{qmp_port},server=on,wait=off",
         "-nic", f"user,hostfwd=tcp:127.0.0.1:{port}-:22",
@@ -134,3 +134,5 @@ async def qemu_wait_startup(qemu: Popen[str], logfile: Path):
             count = 0
         with logfile.open("a+") as f:
             f.write(rm_ansi_escape(text))
+
+    assert qemu.poll() is None, "Qemu exited unexpectedly"
