@@ -438,7 +438,7 @@ BENCHMARKS = [
     Benchmark(
         "blender",
         compiling.main,
-        default={"target": "blender", "delay": 240, "mem": 16},
+        default={"target": "blender", "delay": 360, "mem": 16},
         fast={"target": "write", "delay": 10, "mem": 12},
         args=["--target", "{target}", "-m{mem}", "-c12", "--delay", "{delay}", "--repeat", "3"],
         modes=[

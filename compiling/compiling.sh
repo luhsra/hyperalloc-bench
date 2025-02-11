@@ -67,7 +67,7 @@ for O in $ORDERS; do
 done
 
 # Blender
-ARGS="--target blender -m16 -c12 --delay 240"
+ARGS="--target blender -m16 -c12 --delay 360"
 # python3 bench.py --mode base-manual --suffix blender-base-manual $ARGS
 # python3 bench.py --mode base-auto --suffix blender-base-auto $ARGS
 # python3 bench.py --mode huge-auto --suffix blender-huge-auto $ARGS
