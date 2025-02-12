@@ -261,6 +261,8 @@ runcpu --config=ballooning --action=setup 526.blender_r
 # (about 50min)
 ```
 
+> If the compilation fails (on older SPEC version), you might have to change `-std=c99` to `-std=gnu99` in the `ballooning.cfg`.
+
 Then you can execute the benchmark with:
 
 ```sh
