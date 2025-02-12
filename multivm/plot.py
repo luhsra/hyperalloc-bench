@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import warnings
 
+from matplotlib.axes import Axes
+
 warnings.filterwarnings("ignore")
 
 import pandas as pd
@@ -114,11 +116,16 @@ def relplot(
     def draw_area(data: pd.DataFrame, **kwargs):
         plot_data = data.drop(columns=["mode"])
         kwargs.pop("color")
-        ax = plot_data.plot.area(
+        ax: Axes = plot_data.plot.area(
             x="time", stacked=True, legend=True, ax=plt.gca(), **kwargs
         )
+        total_gib = data[vms].sum(axis=1)
+        gib_max = total_gib.max()
+        gib_min = integrate.trapezoid(total_gib, x=data["time"])
         ax.set_xlim(0, None)
         ax.set_ylim(0, (max_mem * len(vms)) / 1024**3)
+        ax.annotate(f"{gib_min:.0f} GiB*min\nMax: {gib_max:.1f} GiB", xy=(0.5, 0.05), xycoords='axes fraction',
+               ha='center', bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
 
     grid.map_dataframe(draw_area)
     grid.set_titles("{col_name}")
