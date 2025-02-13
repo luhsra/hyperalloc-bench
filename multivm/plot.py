@@ -111,7 +111,7 @@ def relplot(
     print(runs)
     vms = list(runs.values())[0]
 
-    grid = sns.FacetGrid(data, col="mode", height=4.5, aspect=0.9, col_wrap=col_wrap)
+    grid = sns.FacetGrid(data, col="mode", height=5, aspect=0.8, col_wrap=col_wrap)
 
     def draw_area(data: pd.DataFrame, **kwargs):
         plot_data = data.drop(columns=["mode"])
