@@ -291,6 +291,13 @@ async def exec_vm(
         if client:
             await client.disconnect()
         qemu.terminate()
+        try:
+            async with asyncio.timeout(60):
+                while qemu.poll() is None:
+                    await sleep(1)
+        except asyncio.TimeoutError:
+            print("qemu did not terminate -> kill!")
+            qemu.kill()
         await sleep(3)
 
 
