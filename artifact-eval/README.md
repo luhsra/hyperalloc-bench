@@ -71,13 +71,15 @@ sudo chown $USER /dev/kvm
 
 Start the container with:
 ```sh
-./artifact-eval/run.sh
+KEY=~/.ssh/id_rsa ./artifact-eval/run.sh
 # (can be exited with ctrl+C)
 ```
 
+> The `KEY` has to point to an ssh private key. You can generate a key pair with `ssh-keygen`. Use the same key for `ssh`.
+
 Connect to the container with:
 ```sh
-ssh -p2222 user@localhost
+ssh -p2222 -i ~/.ssh/id_rsa user@localhost
 ```
 
 ### Running a Fast Benchmark
@@ -287,8 +289,10 @@ This requires `sshfs` to be installed on your system.
 ```sh
 # Mount the dockers home directory to your host machine
 # (outside the container)
-./artifact-eval/sshfs.sh
+KEY=~/.ssh/id_rsa ./artifact-eval/sshfs.sh
 ```
+
+> `KEY` has to be the same as for docker run (`run.sh`).
 
 Now, you can explore the `llfree_ae` directory with your file manager.
 The home directory contains the following subdirectories:
