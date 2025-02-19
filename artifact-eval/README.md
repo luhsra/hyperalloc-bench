@@ -247,6 +247,8 @@ scp -P2222 cpu2017-1.1.9.iso user@localhost:
 # (inside the container)
 cd hyperalloc-bench
 ./scripts/base.sh --cdrom ~/cpu2017-1.1.9.iso
+ssh -p5223 debian@localhost
+# no password needed
 
 # (inside the VM)
 mkdir spec-iso
