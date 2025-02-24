@@ -125,28 +125,13 @@ def visualize_stream(
     p.set(ylim=(0, None))
     p.set(xlim=(0, stream["IterTime"].max()))
     for ax in p.axes_dict.values():
-        ax.axvline(
-            stream_meta["args"]["post_delay"], color="red", alpha=0.4, zorder=0.9
-        )
-        ax.text(
-            stream_meta["args"]["post_delay"] + 2,
-            ax.viewLim.max[1] * 0.02,
-            "Shrink",
-            color="red",
-            alpha=0.6,
-            size=24,
-        )
-        ax.axvline(
-            stream_meta["args"]["deflate_delay"], color="blue", alpha=0.4, zorder=0.9
-        )
-        ax.text(
-            stream_meta["args"]["deflate_delay"] + 2,
-            ax.viewLim.max[1] * 0.02,
-            "Grow",
-            color="blue",
-            alpha=0.6,
-            size=24,
-        )
+        ax.axvline(stream_meta["args"]["post_delay"], color="red", alpha=0.4, zorder=0.9)
+        ax.text(stream_meta["args"]["post_delay"] + 2, ax.viewLim.max[1] * 0.02,
+            "Shrink", color="red", alpha=0.6, size=28)
+
+        ax.axvline(stream_meta["args"]["deflate_delay"], color="blue", alpha=0.4, zorder=0.9)
+        ax.text(stream_meta["args"]["deflate_delay"] + 2, ax.viewLim.max[1] * 0.02,
+            "Grow", color="blue", alpha=0.6, size=28)
 
     for key, ax in p.axes_dict.items():
         if key != 1:
@@ -222,17 +207,17 @@ def visualize_ftq(
     p.set(ylim=(0, None))
     p.set(xlim=(0, ftq["Times"].max()))
 
-    cpu_freq = cpu_max_freq()
+    cpu_freq = cpu_max_freq(ftq_meta)
     if cpu_freq is not None:
         for ax in p.axes_dict.values():
             post_delay = ftq_meta["args"]["post_delay"] * cpu_freq
             ax.axvline(post_delay, color="red", alpha=0.4, zorder=0.9)
             ax.text(post_delay + 2 * cpu_freq, ax.viewLim.max[1] * 0.02,
-                    "Shrink", color="red", alpha=0.6, size=24)
+                    "Shrink", color="red", alpha=0.6, size=28)
             inflate_delay = ftq_meta["args"]["deflate_delay"] * cpu_freq
             ax.axvline(inflate_delay, color="blue", alpha=0.4, zorder=0.9)
             ax.text(inflate_delay + 2 * cpu_freq, ax.viewLim.max[1] * 0.02,
-                    "Grow", color="blue", alpha=0.6, size=24)
+                    "Grow", color="blue", alpha=0.6, size=28)
 
     for key, ax in p.axes_dict.items():
         if key != 1: ax.set_ylabel("")
@@ -247,7 +232,15 @@ def visualize_ftq(
         dref_dataframe(save_as, out, ["Driver", "Cores", "Times"], ftq)
 
 
-def cpu_max_freq() -> float | None:
+def cpu_max_freq(meta: dict[str, Any]) -> float | None:
+    # Get frequency from meta data
+    if sys := meta.get("sys"):
+        if lscpu := sys.get("lscpu"):
+            print(lscpu)
+            for field in lscpu:
+                if field.get("field") == "CPU max MHz:":
+                    return float(field.get("data")) * 1e6
+    # Fallback to frequency of the current machine (hoping that the measurement was take here)
     try:
         freq = Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq").read_text()
         return float(freq) * 1e3
