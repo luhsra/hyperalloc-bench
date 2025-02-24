@@ -118,7 +118,7 @@ def relplot(
         col="mode",
         col_wrap=col_wrap,
         hue="measurement",
-        height=5.5,
+        height=5,
         legend=False,
     )
     p.set_titles("{col_name}")
@@ -297,7 +297,7 @@ def overview(
         col="variable",
         row="cat",
         height=2,
-        aspect=1.5,
+        aspect=2.4,
         sharex="col",
         sharey="row",
         gridspec_kws={"height_ratios": height_ratios},

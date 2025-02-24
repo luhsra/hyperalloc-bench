@@ -3,6 +3,10 @@ import warnings
 
 from matplotlib.axes import Axes
 
+import matplotlib.lines
+
+import matplotlib.collections
+
 warnings.filterwarnings("ignore")
 
 import pandas as pd
@@ -111,7 +115,7 @@ def relplot(
     print(runs)
     vms = list(runs.values())[0]
 
-    grid = sns.FacetGrid(data, col="mode", height=5, aspect=0.8, col_wrap=col_wrap)
+    grid = sns.FacetGrid(data, col="mode", height=4.7, aspect=0.7, col_wrap=col_wrap)
 
     def draw_area(data: pd.DataFrame, **kwargs):
         plot_data = data.drop(columns=["mode"])
@@ -126,6 +130,10 @@ def relplot(
         ax.set_ylim(0, (max_mem * len(vms)) / 1024**3)
         ax.annotate(f"{gib_min:.0f} GiB*min\nMax: {gib_max:.1f} GiB", xy=(0.5, 0.05), xycoords='axes fraction',
                ha='center', bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
+        # partially rasterize expensive elements
+        for child in ax.get_children():
+            if isinstance(child, matplotlib.lines.Line2D) or isinstance(child, matplotlib.collections.FillBetweenPolyCollection):
+                child.set_rasterized(True)
 
     grid.map_dataframe(draw_area)
     grid.set_titles("{col_name}")

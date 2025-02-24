@@ -100,7 +100,7 @@ def visualize_stream(
     order = drivers
 
     p = sns.FacetGrid(
-        stream, col="Cores", col_order=col_ord, sharey=False, height=6.5, aspect=1
+        stream, col="Cores", col_order=col_ord, sharey=False, height=6.5, aspect=0.92
     )
     p.map_dataframe(
         sns.scatterplot,
@@ -116,7 +116,7 @@ def visualize_stream(
         frameon=True,
         ncol=3,
         loc="upper center",
-        bbox_to_anchor=(0.293, 0.04),
+        bbox_to_anchor=(0.286, 0.04),
         markerscale=3,
     )
 
@@ -197,11 +197,11 @@ def visualize_ftq(
 
     data = ftq.copy()
     data["Counts"] /= 1e6
-    p = sns.FacetGrid(data, col="Cores", col_order=col_ord, sharey=False, height=6.5, aspect=1)
+    p = sns.FacetGrid(data, col="Cores", col_order=col_ord, sharey=False, height=6.5, aspect=0.92)
     p.map_dataframe(sns.scatterplot, x="Times", y="Counts", hue="Driver",
                     hue_order=order, s=30.0, linewidth=0)
     p.set_titles(col_template="{col_name} thread(s)")
-    p.add_legend(frameon=True, ncol=3, loc="upper center", bbox_to_anchor=(0.293, 0.04), markerscale=3)
+    p.add_legend(frameon=True, ncol=3, loc="upper center", bbox_to_anchor=(0.286, 0.04), markerscale=3)
     p.set(ylabel="Work [e6]")
     p.set(xlabel="Cycles")
     p.set(ylim=(0, None))
