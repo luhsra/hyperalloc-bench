@@ -128,7 +128,7 @@ def relplot(
         gib_min = integrate.trapezoid(total_gib, x=data["time"])
         ax.set_xlim(0, None)
         ax.set_ylim(0, (max_mem * len(vms)) / 1024**3)
-        ax.annotate(f"{gib_min:.0f} GiB*min\nMax: {gib_max:.1f} GiB", xy=(0.5, 0.05), xycoords='axes fraction',
+        ax.annotate(f"{gib_min:.0f} GiB·min\nmax: {gib_max:.1f} GiB", xy=(0.5, 0.05), xycoords='axes fraction',
                ha='center', bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
         # partially rasterize expensive elements
         for child in ax.get_children():
@@ -179,7 +179,7 @@ def relplot(
             baseline = (gib_min, gib_max)
 
         print(
-            f"{mode}: {gib_min:.2f} GiB*min",
+            f"{mode}: {gib_min:.2f} GiB·min",
             f"({(gib_min - baseline[0]) / baseline[0]:.2%})",
         )
         print(

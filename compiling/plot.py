@@ -173,11 +173,11 @@ def relplot(
                     run,
                     horizontalalignment="center",
                     path_effects=[
-                        patheffects.withStroke(linewidth=3, foreground="white")
+                        patheffects.withStroke(linewidth=6, foreground="white")
                     ],
                 )
             else:
-                axis.axvline(x=tbuild, color="black", linewidth=3, zorder=1)
+                axis.axvline(x=tbuild, color="black", linewidth=2, zorder=1)
 
             gib_m = calc_gib_min(celld, tstart, tbuild)
             print(f"{modes[i]}: {gib_m:.2f} GiB*m, {tbuild - tstart:.2f} min")
@@ -197,7 +197,7 @@ def relplot(
                 (tdelay, y_at(celld, tdelay, "huge") + max_mem / 32),
                 (tdelay, max_mem * 1.02),
                 horizontalalignment="center",
-                path_effects=[patheffects.withStroke(linewidth=3, foreground="white")],
+                path_effects=[patheffects.withStroke(linewidth=6, foreground="white")],
                 arrowprops={"facecolor": "black"},
                 zorder=11,
             )
@@ -211,7 +211,7 @@ def relplot(
             (tdelay, y_at(celld, tdelay, "huge") + max_mem / 32),
             (tdelay, max_mem * 0.925),
             horizontalalignment="center",
-            path_effects=[patheffects.withStroke(linewidth=3, foreground="white")],
+            path_effects=[patheffects.withStroke(linewidth=6, foreground="white")],
             arrowprops={"facecolor": "black"},
             zorder=11,
         )
@@ -341,7 +341,7 @@ def overview(
                 fmt=lambda x: f"{x:.1f}",
                 fontsize=12,
                 padding=10,
-                path_effects=[patheffects.withStroke(linewidth=3, foreground="white")],
+                path_effects=[patheffects.withStroke(linewidth=8, foreground="white")],
             )
 
         labels = ax.get_yticklabels()
