@@ -1,0 +1,17 @@
+\drefset{talk-inflate/HyperAlloc/Install}{3.9334579027347507}
+\drefset{talk-inflate/HyperAlloc/Reclaim}{344.8474577704259}
+\drefset{talk-inflate/HyperAlloc/Return}{8522.407356778962}
+\drefset{talk-inflate/HyperAlloc/Return + Install}{3.931642973737491}
+\drefset{talk-inflate/virtio-balloon/Install}{0.9706701907542374}
+\drefset{talk-inflate/virtio-balloon/Reclaim}{0.9514601444570262}
+\drefset{talk-inflate/virtio-balloon/Return}{2.3441937239904265}
+\drefset{talk-inflate/virtio-balloon/Return + Install}{0.6864107189693507}
+\drefset{talk-inflate/virtio-balloon-huge/Install}{4.295398350088539}
+\drefset{talk-inflate/virtio-balloon-huge/Reclaim}{136.2361398141854}
+\drefset{talk-inflate/virtio-balloon-huge/Return}{326.0126241086324}
+\drefset{talk-inflate/virtio-balloon-huge/Return + Install}{4.239537593939046}
+\drefset{talk-inflate/virtio-mem/Install}{4.168159394802142}
+\drefset{talk-inflate/virtio-mem/Reclaim}{34.49990158680075}
+\drefset{talk-inflate/virtio-mem/Return}{101.72205885489527}
+\drefset{talk-inflate/virtio-mem/Return + Install}{4.004078306269179}
+\drefset{talk-inflate/max_access}{17.18332101632883}

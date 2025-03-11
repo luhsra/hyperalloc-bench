@@ -37,10 +37,8 @@ def parse_logs(path: Path) -> pd.DataFrame:
             mode = "virtio-balloon"
         case n if "huge-manual" in n:
             mode = "virtio-balloon-huge"
-        case n if "virtio-mem-vfio" in n:
-            mode = "virtio-mem+VFIO"
         case n if "virtio-mem" in n:
-            mode = "virtio-mem"
+            mode = "virtio-mem+VFIO" if "vfio" in n else "virtio-mem"
         case n if "llfree-manual-vfio" in n:
             mode = "HyperAlloc+VFIO"
         case n if "llfree-manual" in n:
@@ -51,7 +49,15 @@ def parse_logs(path: Path) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def visualize(touched: list[Path], untouched: list[Path], save_as: str | None = None, out: Path = Path("out")):
+def visualize(
+    touched: list[Path],
+    untouched: list[Path],
+    save_as: str | None = None,
+    out: Path = Path("out"),
+    titles: bool = True,
+    height: float = 3,
+    aspect: float = 3,
+):
     # Touched
     data = pd.concat([parse_logs(p) for p in touched])
     if data["iter"].max() > 0:
@@ -64,18 +70,20 @@ def visualize(touched: list[Path], untouched: list[Path], save_as: str | None = 
     pgd["time"] = 1 / pgd["time"]
 
     # Untouched
-    data = pd.concat([parse_logs(p) for p in untouched])
-    if data["iter"].max() > 0:
-        data = data[data["iter"] > 0]
+    if untouched:
+        data = pd.concat([parse_logs(p) for p in untouched])
+        if data["iter"].max() > 0:
+            data = data[data["iter"] > 0]
 
-    pgd1 = data.melt(id_vars=["mode", "iter"], value_vars=["shrink", "grow"],
-                    var_name="op", value_name="time")
-    pgd1["time"] = 1 / pgd1["time"]
-    pgd1 = pgd1[pgd1["op"] == "shrink"]
-    pgd1["op"] = "Reclaim Untouched"
+        pgd1 = data.melt(id_vars=["mode", "iter"], value_vars=["shrink", "grow"],
+                        var_name="op", value_name="time")
+        pgd1["time"] = 1 / pgd1["time"]
+        pgd1 = pgd1[pgd1["op"] == "shrink"]
+        pgd1["op"] = "Reclaim Untouched"
+
+        pgd = pd.concat([pgd, pgd1])
 
     # Both
-    pgd = pd.concat([pgd, pgd1])
     pgd.loc[pgd["op"] == "shrink", "op"] = "Reclaim"
     pgd.loc[pgd["op"] == "grow", "op"] = "Return"
     pgd.loc[pgd["op"] == "install", "op"] = "Return + Install"
@@ -84,14 +92,18 @@ def visualize(touched: list[Path], untouched: list[Path], save_as: str | None = 
 
     print(pgd["time"].max())
     order = ["virtio-balloon","virtio-balloon-huge","virtio-mem","virtio-mem+VFIO","HyperAlloc","HyperAlloc+VFIO"]
-    p = sns.FacetGrid(pgd, row="op", margin_titles=True,
-                    row_order=["Reclaim", "Reclaim Untouched", "Return", "Return + Install"],
-                    aspect=3, height=3, sharex=False)
+    order = [o for o in order if o in pgd["mode"].unique()]
+    row_order = ["Reclaim", "Reclaim Untouched", "Return", "Return + Install"]
+    row_order = [o for o in row_order if o in pgd["op"].unique()]
+
+    p = sns.FacetGrid(pgd, row="op", margin_titles=titles,
+                    row_order=row_order, aspect=aspect, height=height, sharex=False)
 
     p.map_dataframe(sns.barplot, y="mode", hue="mode", hue_order=order,
                     palette="colorblind6", x="time", dodge=False)
     p.set(ylabel=None)
-    p.figure.subplots_adjust(hspace=0.5)
+    if height == 3:
+        p.figure.subplots_adjust(hspace=1)
 
     def mem_fmt(x: float) -> str:
         x *= 1024**3
@@ -115,7 +127,10 @@ def visualize(touched: list[Path], untouched: list[Path], save_as: str | None = 
         for c in ax.containers:
             ax.bar_label(c, fmt=mem_fmt, fontsize=12, padding=10,
                         path_effects=[patheffects.withStroke(linewidth=5, foreground='white')])
-    p.set_titles(row_template="{row_name}", xytext=(1.08, 0.5))
+    if titles:
+        p.set_titles(row_template="{row_name}", xytext=(1.08, 0.5))
+    else:
+        p.set_titles(row_template="")
     if save_as:
         p.figure.savefig(out / f"{save_as}.pdf", bbox_inches="tight")
         p.figure.savefig(out / f"{save_as}.svg", bbox_inches="tight")
