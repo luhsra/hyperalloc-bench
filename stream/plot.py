@@ -69,10 +69,10 @@ def load_stream_csv(p: Path, cores: int, driver: str) -> pd.DataFrame:
 
 
 def load_streams(
-    p: Path, drivers: list[str], max_t: float = 140.0
+    p: Path, drivers: list[str], max_t: float = 140.0, cores: list[int] | None = None
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     meta = json.load((p / f"{DRIVER_MAP['Baseline']}-stream" / "meta.json").open())
-    cores = meta["args"]["bench_threads"]
+    cores = cores if cores else meta["args"]["bench_threads"]
     print("loading", len(drivers), "modes for", cores, "cores")
     frames = []
     for c in cores:
@@ -94,13 +94,17 @@ def visualize_stream(
     stream_meta: dict[str, Any],
     save_as: str | None = None,
     out: Path = Path("out"),
+    height: float = 6.5,
+    aspect: float = 0.92,
+    legend_ncol: int = 3,
+    legend_xoff: float = 0.286,
 ) -> tuple[sns.FacetGrid, pd.DataFrame]:
-    print("plotting", len(drivers), "modes")
-    col_ord = stream_meta["args"]["bench_threads"]
+    col_ord = stream["Cores"].unique()
+    print("plotting", len(drivers), "modes", col_ord, "cores")
     order = drivers
 
     p = sns.FacetGrid(
-        stream, col="Cores", col_order=col_ord, sharey=False, height=6.5, aspect=0.92
+        stream, col="Cores", col_order=col_ord, sharey=False, height=height, aspect=aspect
     )
     p.map_dataframe(
         sns.scatterplot,
@@ -114,9 +118,9 @@ def visualize_stream(
     p.set_titles(col_template="{col_name} thread(s)")
     p.add_legend(
         frameon=True,
-        ncol=3,
+        ncol=legend_ncol,
         loc="upper center",
-        bbox_to_anchor=(0.286, 0.04),
+        bbox_to_anchor=(legend_xoff, 0.04),
         markerscale=3,
     )
 
@@ -134,7 +138,7 @@ def visualize_stream(
             "Grow", color="blue", alpha=0.6, size=28)
 
     for key, ax in p.axes_dict.items():
-        if key != 1:
+        if key != col_ord[0]:
             ax.set_ylabel("")
         for c in ax.get_children():
             if isinstance(c, matplotlib.collections.PathCollection):
