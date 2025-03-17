@@ -116,13 +116,14 @@ def visualize_stream(
         linewidth=0,
     )
     p.set_titles(col_template="{col_name} thread(s)")
-    p.add_legend(
-        frameon=True,
-        ncol=legend_ncol,
-        loc="upper center",
-        bbox_to_anchor=(legend_xoff, 0.04),
-        markerscale=3,
-    )
+    if legend_ncol > 0:
+        p.add_legend(
+            frameon=True,
+            ncol=legend_ncol,
+            loc="upper center",
+            bbox_to_anchor=(legend_xoff, 0.04),
+            markerscale=3,
+        )
 
     p.set(ylabel="Bandwith [GB/s]")
     p.set(xlabel="Runtime [s]")
