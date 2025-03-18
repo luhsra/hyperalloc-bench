@@ -104,7 +104,8 @@ def relplot(
     data: pd.DataFrame,
     times: dict[str, list[BTimes]],
     col_wrap=10,
-    run="build",
+    hide: list[str] = [],
+    legend=True,
 ) -> tuple[sns.FacetGrid, dict[str, float]]:
 
     modes = data["mode"].unique()
@@ -140,17 +141,19 @@ def relplot(
     grid.set(ylabel="Memory consumption [GiB]")
     grid.set(xlabel="Time [min]")
 
-    h = list(grid.axes[0].get_legend_handles_labels()[0])
-    # grid.add_legend(dict(zip(vms, h)), loc="upper center", bbox_to_anchor=(0.14, 0.04), ncol=7, frameon=True)
-    grid.add_legend(
-        dict(zip(vms, h)),
-        loc="upper center",
-        bbox_to_anchor=(0.278, 0.9),
-        ncol=1,
-        frameon=True,
-    )
+    if legend:
+        h = list(grid.axes[0].get_legend_handles_labels()[0])
+        # grid.add_legend(dict(zip(vms, h)), loc="upper center", bbox_to_anchor=(0.14, 0.04), ncol=7, frameon=True)
+        grid.add_legend(
+            dict(zip(vms, h)),
+            loc="upper center",
+            bbox_to_anchor=(0.278, 0.9),
+            ncol=1,
+            frameon=True,
+        )
 
     if False:
+        # Visualize run times and delays
         colors = sns.color_palette("colorblind6")
         for mode, mt in times.items():
             for i, time in enumerate(mt):
@@ -188,6 +191,11 @@ def relplot(
         )
         print(f"  VM max: {vm_gib_max:.2f} GiB")
 
+        if mode in hide:
+            axis = grid.facet_axis(0, list(modes).index(mode))
+            axis.clear()
+            axis.set_axis_off()
+
     return grid, extra_keys
 
 
@@ -195,17 +203,20 @@ def visualize(
     modes: dict[str, Path],
     save_as: str | None = None,
     col_wrap=10,
-    run="build",
     out: Path = Path("out"),
+    hide: list[str] = [],
+    legend=True,
+    dref=True,
 ) -> sns.FacetGrid:
     meta = json.load((list(modes.values())[0] / "meta.json").open())
     max_mem = meta["args"]["mem"] * 1024**3
     data, times = load_data(max_mem, modes, meta["args"]["vms"])
-    p, extra_keys = relplot(max_mem, data, times, col_wrap, run=run)
+    p, extra_keys = relplot(max_mem, data, times, col_wrap, hide=hide, legend=legend)
     if save_as:
         p.savefig(out / f"{save_as}.pdf")
         p.savefig(out / f"{save_as}.svg")
-        # dref_dataframe(save_as, out, ["mode", "measurement", "time"], data)
-        with (out / f"{save_as}_extra.dref").open("w+") as f:
-            dump_dref(f, save_as, extra_keys)
+        if dref:
+            # dref_dataframe(save_as, out, ["mode", "measurement", "time"], data)
+            with (out / f"{save_as}_extra.dref").open("w+") as f:
+                dump_dref(f, save_as, extra_keys)
     return p

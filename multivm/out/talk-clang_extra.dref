@@ -1,0 +1,9 @@
+\drefset{talk-clang/multivm/Baseline/gib_min}{14591.151776930492}
+\drefset{talk-clang/multivm/Baseline/gib_max}{40.74307632446289}
+\drefset{talk-clang/multivm/Baseline/vm_gib_max}{13.818408966064453}
+\drefset{talk-clang/multivm/virtio-balloon(-huge)/gib_min}{12286.703814752262}
+\drefset{talk-clang/multivm/virtio-balloon(-huge)/gib_max}{35.982975006103516}
+\drefset{talk-clang/multivm/virtio-balloon(-huge)/vm_gib_max}{13.864376068115234}
+\drefset{talk-clang/multivm/HyperAlloc/gib_min}{8427.558012120246}
+\drefset{talk-clang/multivm/HyperAlloc/gib_max}{28.109066009521484}
+\drefset{talk-clang/multivm/HyperAlloc/vm_gib_max}{13.707050323486328}

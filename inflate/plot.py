@@ -57,6 +57,7 @@ def visualize(
     titles: bool = True,
     height: float = 3,
     aspect: float = 3,
+    hide: list[str] = []
 ):
     # Touched
     data = pd.concat([parse_logs(p) for p in touched])
@@ -113,6 +114,11 @@ def visualize(
             if x > mul: return f"{x/mul:.1f} {suffix}/s"
         return f"{x:.2} B/s"
 
+    if titles:
+        p.set_titles(row_template="{row_name}", xytext=(1.08, 0.5))
+    else:
+        p.set_titles(row_template="")
+
     for key, ax in p.axes_dict.items():
         if key != "Return + Install":
             ax.set(xlim=(1e-1, 1e5))
@@ -127,10 +133,12 @@ def visualize(
         for c in ax.containers:
             ax.bar_label(c, fmt=mem_fmt, fontsize=12, padding=10,
                         path_effects=[patheffects.withStroke(linewidth=5, foreground='white')])
-    if titles:
-        p.set_titles(row_template="{row_name}", xytext=(1.08, 0.5))
-    else:
-        p.set_titles(row_template="")
+
+        if key in hide:
+            ax.clear()
+            ax.set_axis_off()
+
+
     if save_as:
         p.figure.savefig(out / f"{save_as}.pdf", bbox_inches="tight")
         p.figure.savefig(out / f"{save_as}.svg", bbox_inches="tight")

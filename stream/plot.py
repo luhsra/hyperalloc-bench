@@ -98,6 +98,7 @@ def visualize_stream(
     aspect: float = 0.92,
     legend_ncol: int = 3,
     legend_xoff: float = 0.286,
+    dref=True,
 ) -> tuple[sns.FacetGrid, pd.DataFrame]:
     col_ord = stream["Cores"].unique()
     print("plotting", len(drivers), "modes", col_ord, "cores")
@@ -149,7 +150,8 @@ def visualize_stream(
         print("save to", out / f"{save_as}")
         p.savefig(out / f"{save_as}.pdf", bbox_inches="tight", dpi=100)
         p.savefig(out / f"{save_as}.svg", bbox_inches="tight", dpi=100)
-        dref_dataframe(save_as, out, ["Driver", "Cores", "IterTime"], stream)
+        if dref:
+            dref_dataframe(save_as, out, ["Driver", "Cores", "IterTime"], stream)
 
     return p, stream
 
