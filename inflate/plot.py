@@ -2,6 +2,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+import math
 import pandas as pd
 import seaborn as sns
 from pathlib import Path
@@ -22,15 +23,26 @@ def init():
 
 
 def parse_logs(path: Path) -> pd.DataFrame:
-    meta = json.load((path / f"meta.json").open())
-    data = pd.read_csv(path / "out.csv")
-    data["iter"] = data.index
-    data["shrink"] = (data["shrink"] / 1e9) / meta["args"]["mem"]
-    data["grow"] = (data["grow"] / 1e9) / meta["args"]["mem"]
-    if "touch" in data.columns:
-        data["touch"] = (data["touch"] / 1e9) / (meta["args"]["mem"] - 1)
-    if "touch" in data.columns:
-        data["touch2"] = (data["touch2"] / 1e9) / (meta["args"]["mem"] - 1)
+    try:
+        meta = json.load((path / f"meta.json").open())
+        data = pd.read_csv(path / "out.csv")
+        data["iter"] = data.index
+        data["shrink"] = (data["shrink"] / 1e9) / meta["args"]["mem"]
+        data["grow"] = (data["grow"] / 1e9) / meta["args"]["mem"]
+        if "touch" in data.columns:
+            data["touch"] = (data["touch"] / 1e9) / (meta["args"]["mem"] - 1)
+        if "touch" in data.columns:
+            data["touch2"] = (data["touch2"] / 1e9) / (meta["args"]["mem"] - 1)
+    except Exception as e:
+        print(f"Error parsing {path}: {e}")
+        data = pd.DataFrame({
+            "mode": [path.stem],
+            "iter": [1],
+            "shrink": [math.nan],
+            "grow": [math.nan],
+            "touch": [math.nan],
+            "touch2": [math.nan],
+        })
 
     match path.stem:
         case n if "base-manual" in n:
@@ -92,7 +104,7 @@ def visualize(
     print(pgd["op"].unique())
 
     print(pgd["time"].max())
-    order = ["virtio-balloon","virtio-balloon-huge","virtio-mem","virtio-mem+VFIO","HyperAlloc","HyperAlloc+VFIO"]
+    order = ["", " ", "virtio-balloon","virtio-balloon-huge","virtio-mem","virtio-mem+VFIO","HyperAlloc","HyperAlloc+VFIO"]
     order = [o for o in order if o in pgd["mode"].unique()]
     row_order = ["Reclaim", "Reclaim Untouched", "Return", "Return + Install"]
     row_order = [o for o in row_order if o in pgd["op"].unique()]
