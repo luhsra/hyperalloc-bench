@@ -1,0 +1,15 @@
+\drefset{talk-clang-t/baseline/0/run/gib_m}{484.23777122847235}
+\drefset{talk-clang-t/baseline/0/run/gib_m/used}{283.0375200179418}
+\drefset{talk-clang-t/baseline/0/run/time}{41.21137633721034}
+\drefset{talk-clang-t/baseline/gib_m}{644.8591476434071}
+\drefset{talk-clang-t/baseline/gib_m/used}{308.4813714211782}
+\drefset{talk-clang-t/virtio-balloon(-huge)/0/run/gib_m}{430.6052830931346}
+\drefset{talk-clang-t/virtio-balloon(-huge)/0/run/gib_m/used}{279.5085152540207}
+\drefset{talk-clang-t/virtio-balloon(-huge)/0/run/time}{41.284507262706754}
+\drefset{talk-clang-t/virtio-balloon(-huge)/gib_m}{538.3611786572138}
+\drefset{talk-clang-t/virtio-balloon(-huge)/gib_m/used}{304.0014104808172}
+\drefset{talk-clang-t/HyperAlloc/0/run/gib_m}{357.6794260842006}
+\drefset{talk-clang-t/HyperAlloc/0/run/gib_m/used}{282.2506385052999}
+\drefset{talk-clang-t/HyperAlloc/0/run/time}{40.78520108858744}
+\drefset{talk-clang-t/HyperAlloc/gib_m}{422.962948439916}
+\drefset{talk-clang-t/HyperAlloc/gib_m/used}{308.51326493994395}

@@ -106,6 +106,7 @@ def relplot(
     col_wrap=10,
     hide: list[str] = [],
     legend=True,
+    annotate=True,
 ) -> tuple[sns.FacetGrid, dict[str, float]]:
 
     modes = data["mode"].unique()
@@ -129,8 +130,10 @@ def relplot(
         gib_min = integrate.trapezoid(total_gib, x=data["time"])
         ax.set_xlim(0, None)
         ax.set_ylim(0, (max_mem * len(vms)) / 1024**3)
-        ax.annotate(f"{gib_min:.0f} GiB·min\nmax: {gib_max:.1f} GiB", xy=(0.5, 0.05), xycoords='axes fraction',
-               ha='center', bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
+        if annotate:
+            ax.annotate(f"{gib_min:.0f} GiB·min\nmax: {gib_max:.1f} GiB",
+                xy=(0.5, 0.05), xycoords='axes fraction', ha='center',
+                bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
         # partially rasterize expensive elements
         for child in ax.get_children():
             if isinstance(child, matplotlib.lines.Line2D) or isinstance(child, matplotlib.collections.FillBetweenPolyCollection):
@@ -207,11 +210,13 @@ def visualize(
     hide: list[str] = [],
     legend=True,
     dref=True,
+    annotate=True,
 ) -> sns.FacetGrid:
     meta = json.load((list(modes.values())[0] / "meta.json").open())
     max_mem = meta["args"]["mem"] * 1024**3
     data, times = load_data(max_mem, modes, meta["args"]["vms"])
-    p, extra_keys = relplot(max_mem, data, times, col_wrap, hide=hide, legend=legend)
+    p, extra_keys = relplot(max_mem, data, times, col_wrap, hide=hide,
+                            legend=legend, annotate=annotate)
     if save_as:
         p.savefig(out / f"{save_as}.pdf")
         p.savefig(out / f"{save_as}.svg")
